@@ -72,3 +72,92 @@ export function pickFrames(yaw: number): Shown {
   const raw = (t - edge) / DISSOLVE;
   return { a: i, b: i + 1, blend: raw < 0 ? 0 : raw > 1 ? 1 : raw };
 }
+
+/*
+ * Her mouth and her blink, as patches.
+ *
+ * The same rule as the head: these are his renders, not a warp. But a whole second copy of her
+ * for every mouth shape would be megabytes, and worse, two renders of her are not the same
+ * picture with one thing changed -- her hair comes back re-drawn every time, so swapping whole
+ * frames while she talks would re-draw her hair several times a second. So the mouth is cut out
+ * of each render and laid over the front frame (tools/compose-visemes.py), which is a few
+ * kilobytes and leaves the rest of her exactly the picture he approved.
+ *
+ * A patch only ever goes on the FRONT frame. When her head is turned you are not looking at her
+ * mouth straight on, and there is no render of a turned mouth to be honest with.
+ */
+
+export interface Patch {
+  src: string;
+  /** Where it sits inside the FRAME_SIZE square. */
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
+
+/** The index in FRAMES of the frame the patches belong to. */
+export const FRONT = 1;
+
+/**
+ * Her mouth, as the pictures of it that exist, in order of how open it is.
+ *
+ * The lip sync hands over a shape -- how open the mouth is, and how wide -- for every instant of
+ * a sentence (src/lib/talk/visemes.ts). There are four pictures of her mouth and one of them is
+ * the front frame's own, so the openness is read off this ladder and the two nearest pictures are
+ * cross-faded. That is the same thing the head turn does, for the same reason: a picture held and
+ * flicked to the next reads as drawn animation, and nothing is deformed to get there.
+ *
+ * Her closed-lipped smile is NOT on the ladder. It is a thing she does when she is listening to
+ * you, not a sound, and flashing it between syllables would be a tic.
+ */
+export const MOUTHS: { patch: 'mouth-MBP' | 'mouth-O' | 'mouth-A' | null; open: number }[] = [
+  { patch: 'mouth-MBP', open: 0 },
+  // The front frame's own mouth, closed and faintly smiling. Nothing is drawn over her for this.
+  { patch: null, open: 0.1 },
+  { patch: 'mouth-O', open: 0.5 },
+  { patch: 'mouth-A', open: 0.85 },
+];
+
+/** Below this the mouth is rounded, and she holds the O rather than opening into an "ah". */
+export const ROUND_BELOW = 0.85;
+
+export interface Mouth {
+  /** Index into MOUTHS of the picture underneath. */
+  a: number;
+  /** Index of the one drawn over it. */
+  b: number;
+  /** How solid b is, 0 to 1. */
+  blend: number;
+}
+
+/** Which mouth pictures to draw for a shape the lip sync asked for. */
+export function pickMouth(shape: { open: number; wide: number }): Mouth {
+  // A rounded sound keeps her lips rounded: it must not run on up into the wide-open "ah".
+  const want = shape.wide < ROUND_BELOW ? Math.min(shape.open, MOUTHS[2].open) : shape.open;
+  const lo = MOUTHS[0].open;
+  const hi = MOUTHS[MOUTHS.length - 1].open;
+  const o = want > lo ? (want < hi ? want : hi) : lo;
+  let i = 0;
+  while (i < MOUTHS.length - 2 && o > MOUTHS[i + 1].open) i++;
+  const t = (o - MOUTHS[i].open) / (MOUTHS[i + 1].open - MOUTHS[i].open);
+  return { a: i, b: i + 1, blend: t < 0 ? 0 : t > 1 ? 1 : t };
+}
+
+/*
+ * Her blink. Eyelids close in about the time it takes to say one letter and open a little slower,
+ * and she does it every few seconds, never on a fixed beat -- a blink you can predict is worse
+ * than none at all.
+ */
+export const BLINK_SHUT_MS = 90;
+export const BLINK_OPEN_MS = 130;
+export const BLINK_EVERY_MS: [number, number] = [3200, 6800];
+
+/** How closed her eyes are, 0 to 1, this far into a blink. */
+export function blinkAt(ms: number): number {
+  if (ms < 0) return 0;
+  if (ms < BLINK_SHUT_MS) return ms / BLINK_SHUT_MS;
+  const after = ms - BLINK_SHUT_MS;
+  if (after < BLINK_OPEN_MS) return 1 - after / BLINK_OPEN_MS;
+  return 0;
+}
