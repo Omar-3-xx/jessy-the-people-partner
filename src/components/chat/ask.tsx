@@ -112,12 +112,17 @@ export function Ask() {
               {s.link && (
                 <>
                   {' '}
-                  <Link href={s.link.href} className="font-semibold underline decoration-gold decoration-2">
+                  <Link href={s.link.href} className="whitespace-nowrap font-semibold underline decoration-gold decoration-2">
                     {s.link.label}
                   </Link>
                 </>
               )}
             </div>
+            {/* Decision 3 of his sheet: the line sits under EVERY answer, not once at the bottom of
+                the page, so it is read with the answer and not scrolled past. The page is at /law. */}
+            {s.who === 'jessy' && (
+              <p className="mt-1 text-[11px] opacity-55">ده شرح لنص القانون، مش استشارة قانونية.</p>
+            )}
           </div>
         ))}
         {typing && <p className="text-right text-sm opacity-50">جيسي بتكتب…</p>}
@@ -133,7 +138,7 @@ export function Ask() {
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
             maxLength={500}
-            placeholder="اسألي عن أي إجازة…"
+            placeholder="اسألني عن أي إجازة…"
             aria-label="سؤالك"
             className="flex-1 rounded-xl border border-black/15 bg-white px-4 py-3 text-sm outline-none focus:border-ink"
           />
@@ -146,9 +151,8 @@ export function Ask() {
           </button>
         </div>
         <p className="pb-2 text-center text-[11px] opacity-60">
-          ده شرح لنصوص القانون، مش استشارة قانونية.{' '}
           <Link href="/law" className="underline">
-            اعرف أكتر
+            حدود الإجابات دي ونصوص القانون
           </Link>
         </p>
       </form>
