@@ -8,3 +8,6 @@ out/
 cloudflare-env.d.ts
 next-env.d.ts
 *.log
+
+# python bytecode from the frame tools
+__pycache__/
