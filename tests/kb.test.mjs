@@ -1,8 +1,10 @@
 import assert from 'node:assert/strict';
+import { readdirSync } from 'node:fs';
+import { relative, sep } from 'node:path';
 import test from 'node:test';
 
 import { ENTRIES, FALLBACK } from '../src/lib/kb-data.ts';
-import { answerFrom, match } from '../src/lib/kb.ts';
+import { answerFrom, localise, match } from '../src/lib/kb.ts';
 
 /*
  * Every leave question an employee actually asks must reach the entry that
@@ -99,4 +101,25 @@ test('the figures the handed-over document got wrong are right here', () => {
 test('ids are unique', () => {
   const ids = ENTRIES.map((e) => e.id);
   assert.equal(new Set(ids).size, ids.length);
+});
+
+test('an answer links to a page this site actually has', () => {
+  // The links came over from a site with a /{locale} segment in front of every route. This one
+  // has none — the law page is /law — so a localised href pointed every answer at a 404.
+  const routes = new Set(
+    readdirSync('src/app', { recursive: true, withFileTypes: true })
+      .filter((e) => e.isFile() && e.name === 'page.tsx')
+      .map((e) => '/' + relative('src/app', e.parentPath).split(sep).join('/'))
+      .map((r) => (r === '/' ? '/' : r.replace(/\/$/, ''))),
+  );
+  assert.ok(routes.has('/law'), 'the law page must exist for the links to point at it');
+  const linked = [...ENTRIES, FALLBACK].filter((e) => e.link);
+  assert.ok(linked.length > 0, 'something must carry a link, or this test proves nothing');
+  for (const entry of linked) {
+    for (const lang of ['ar', 'en']) {
+      const { href, external } = localise(entry.link, lang);
+      if (external) continue;
+      assert.ok(routes.has(href.split('#')[0]), `${entry.id} links to ${href}, which is not a page`);
+    }
+  }
 });

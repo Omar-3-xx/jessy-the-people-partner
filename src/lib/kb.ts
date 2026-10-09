@@ -1,5 +1,5 @@
 /*
- * Ask Tigo's own answering, with no AI model behind it: the question is
+ * Jessy's own answering, with no AI model behind it: the question is
  * normalised (Arabic spellings folded together, digits made Latin), safety
  * triggers are checked first, then the best-scoring entry of the knowledge base
  * answers. The same code runs on the server (the fallback when no model is
@@ -10,11 +10,11 @@
 
 export type Lang = 'en' | 'ar';
 
-/** How Tigo's face looks while he gives an answer. */
+/** How Jessy's face looks while she gives an answer. */
 export type Mood = 'happy' | 'laugh' | 'think' | 'calm' | 'surprised';
 
 export interface KbLink {
-  /** A site path ("/height-check") or a full URL. `{locale}` is replaced by the reader's language. */
+  /** A site path ("/law") or a full URL. There is no locale segment on this site. */
   href: string;
   label: { en: string; ar: string };
 }
@@ -36,7 +36,7 @@ export interface KbEntry {
   /** Only for short messages ("hi", "thanks"): the entry is skipped when the question has more words. */
   maxWords?: number;
   answer: { en: string; ar: string };
-  /** Other answers Tigo may give instead, one picked at random each time, so a joke changes. */
+  /** Other answers Jessy may give instead, one picked at random each time, so a phrasing changes. */
   more?: { en: string; ar: string }[];
   /** His face while he says it. Safety answers are always calm, and "I'm not sure" is thoughtful. */
   mood?: Mood;
@@ -203,10 +203,11 @@ export function match(entries: KbEntry[], question: string): KbEntry | null {
 export function localise(link: KbLink | undefined, lang: Lang): KbAnswer['link'] {
   if (!link) return undefined;
   const external = /^https?:\/\//.test(link.href);
+  // There is no locale segment on this site: the law page is /law, not /ar/law. The paths in
+  // kb-data are already the real routes, so an internal href is passed through untouched — a
+  // "/{locale}" prefix here sent every answer's link to a 404.
   const href = link.href.replace('{locale}', lang);
-  // "/" is the home page, "/#formula" a place on it: both hang straight off the language, with no slash before the #.
-  const path = href === '/' ? '' : href.startsWith('/#') ? href.slice(1) : href;
-  return { href: external ? href : `/${lang}${path}`, label: link.label[lang], external };
+  return { href, label: link.label[lang], external };
 }
 
 /** Picks one of n answers. Random for readers; the tests pass their own. */

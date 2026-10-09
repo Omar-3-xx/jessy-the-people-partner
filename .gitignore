@@ -6,4 +6,5 @@ out/
 .env.local
 .wrangler/
 cloudflare-env.d.ts
+next-env.d.ts
 *.log

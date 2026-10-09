@@ -1,0 +1,17 @@
+# Headers for the files Cloudflare Workers serves straight from static assets: public/ and
+# Next's built files. Those never reach the Worker, so next.config.mjs's headers() cannot add
+# anything to them; the pages and /api/ask still get theirs from next.config.mjs.
+# https://developers.cloudflare.com/workers/static-assets/headers/
+
+/*
+  Permissions-Policy: camera=(), accelerometer=(), gyroscope=(), microphone=(self), geolocation=()
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: strict-origin-when-cross-origin
+  X-Frame-Options: SAMEORIGIN
+
+# microphone=(self) is not decoration: /record/recorder.html is a static file, so this file is
+# the only thing that grants it a microphone. Drop it and whoever records her 28 lines is stuck.
+
+# Next's built files carry a hash in their names: kept for a year, never asked for again.
+/_next/static/*
+  Cache-Control: public,max-age=31536000,immutable
