@@ -152,7 +152,13 @@ export async function POST(req: Request) {
     // A legal figure may only be repeated back, never produced: the conversation is the whole allowance.
     const context = [...history.map((t) => t.content), question].join('\n');
     const safe = guardReply(text, context);
-    if (!safe) return Response.json(local);
+    if (!safe) {
+      // Silence here is the hardest of the four to tell apart from an ordinary miss: the model
+      // answered, and the guard found a figure that was never in the conversation. The length says
+      // whether it replied at all; the text itself is someone's question and is not logged.
+      console.warn(`[ask] guard refused the model's reply, ${text.length} chars`);
+      return Response.json(local);
+    }
     return Response.json({
       id: 'model',
       kind: 'model',
