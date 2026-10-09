@@ -25,13 +25,26 @@ const WINDOW_MS = 5 * 60_000;
 const PER_WINDOW = 20;
 /*
  * Pinned, not 'latest': on a site about the law, a model that changes under us changes how
- * borderline questions are handled. The id was checked against the live API, twice over —
- * ListModels is not enough on its own. `gemini-2.0-flash` is absent from it altogether, and
- * `gemini-2.5-flash` IS listed yet answers 404 "no longer available to new users", naming this
- * one in its place. Both would have 404'd on every call, and the site would have looked merely
- * forgetful rather than broken.
+ * borderline questions are handled. Each id was checked against the live API, twice over —
+ * ListModels is not enough on its own. `gemini-2.0-flash` is absent from it altogether, while
+ * `gemini-2.5-flash` and `gemini-2.5-flash-lite` are both listed and both answer 404, "no
+ * longer available to new users". Each would have 404'd on every call, and the site would have
+ * looked merely forgetful rather than broken.
+ *
+ * Two ids, tried in order, because the free tier's allowance is per model and per day.
+ * `gemini-3.8-flash` grants twenty calls a day — Google's own quota error names the number,
+ * GenerateRequestsPerDayPerProjectPerModel-FreeTier = 20 — which an afternoon of testing spends
+ * before the first visitor arrives; the site then falls back on every miss until midnight. A
+ * lite model carries the larger allowance and gives up nothing here, because Jessy may only
+ * rephrase, ask what someone means, or say she does not know: every legal figure on this site
+ * is the knowledge base's, and guardReply throws away a reply that states any other. Against
+ * the real system prompt its answers ran 130-155 characters, finished cleanly, and passed the
+ * guard — the three in tests/ask-guard.test.mjs are those answers, word for word.
  */
-const MODEL = process.env.JESSY_CHAT_MODEL || 'gemini-3.8-flash';
+const MODELS = (process.env.JESSY_CHAT_MODEL || 'gemini-3.1-flash-lite,gemini-3.5-flash')
+  .split(',')
+  .map((id) => id.trim())
+  .filter(Boolean);
 
 /** Questions per address in the last five minutes. One server's memory: enough to stop a loop, not a crowd. */
 const recent = new Map<string, number[]>();
@@ -105,68 +118,83 @@ export async function POST(req: Request) {
   if (local.kind !== 'fallback' || !key) return Response.json(local);
 
   const history = cleanHistory(body.history);
-  try {
-    const res = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(MODEL)}:generateContent`,
-      {
-        method: 'POST',
-        headers: { 'content-type': 'application/json', 'x-goog-api-key': key },
-        body: JSON.stringify({
-          systemInstruction: { parts: [{ text: SYSTEM_PROMPT }] },
-          contents: [...history, { role: 'user' as const, content: question }].map((turn) => ({
-            role: turn.role === 'assistant' ? 'model' : 'user',
-            parts: [{ text: turn.content }],
-          })),
-          generationConfig: {
-            maxOutputTokens: 300,
-            temperature: 0.2,
-            // Gemini 3 spends the output budget on internal reasoning first, which cut every
-            // reply off mid-word. Jessy only has to rephrase, ask what someone means, or say she
-            // does not know, so she is given no thinking budget at all.
-            thinkingConfig: { thinkingBudget: 0 },
-          },
-        }),
-        signal: AbortSignal.timeout(15_000),
-      },
-    );
-    if (!res.ok) {
-      // The body carries Gemini's own reason — a retired model id, a key the project does not
-      // cover, a quota. It is the sentence that would have saved a day, so it is read and logged.
-      const why = await res.text().catch(() => '');
-      console.warn(`[ask] model ${MODEL} answered ${res.status}: ${why.slice(0, 400)}`);
-      return Response.json(local);
+  // One request body for every id: only the model in the URL changes.
+  const payload = JSON.stringify({
+    systemInstruction: { parts: [{ text: SYSTEM_PROMPT }] },
+    contents: [...history, { role: 'user' as const, content: question }].map((turn) => ({
+      role: turn.role === 'assistant' ? 'model' : 'user',
+      parts: [{ text: turn.content }],
+    })),
+    generationConfig: {
+      // 300 left no margin at all: the guard lets a 600-character reply through, and 600
+      // characters of Arabic is close to 300 tokens by itself — so a long answer was cut off,
+      // and then thrown away by the check below for having been cut off.
+      maxOutputTokens: 800,
+      temperature: 0.2,
+      // Gemini 3 spends the output budget on internal reasoning first, which cut every
+      // reply off mid-word. Jessy only has to rephrase, ask what someone means, or say she
+      // does not know, so she is given no thinking budget at all.
+      thinkingConfig: { thinkingBudget: 0 },
+    },
+  });
+
+  // Each id gets its own attempt, and the whole wait is bounded: someone is reading this page
+  // aloud, so two timeouts must still be shorter than giving up on her.
+  for (const model of MODELS) {
+    try {
+      const res = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`,
+        {
+          method: 'POST',
+          headers: { 'content-type': 'application/json', 'x-goog-api-key': key },
+          body: payload,
+          signal: AbortSignal.timeout(12_000),
+        },
+      );
+      if (!res.ok) {
+        // The body carries Gemini's own reason — a retired id, a key the project does not cover,
+        // a day's quota spent. It is the sentence that would have saved a day, so it is read and
+        // logged; then the next id is tried, whose allowance is counted separately from this one.
+        const why = await res.text().catch(() => '');
+        console.warn(`[ask] model ${model} answered ${res.status}: ${why.slice(0, 400)}`);
+        continue;
+      }
+      const data = (await res.json()) as {
+        candidates?: { finishReason?: string; content?: { parts?: { text?: string }[] } }[];
+      };
+      const candidate = data.candidates?.[0];
+      // Half a sentence about the law is worse than none: a reply that ran out of room is dropped.
+      if (candidate?.finishReason && candidate.finishReason !== 'STOP') {
+        console.warn(`[ask] model ${model} reply dropped, finishReason ${candidate.finishReason}`);
+        continue;
+      }
+      const text = (candidate?.content?.parts ?? [])
+        .map((part) => part.text)
+        .filter((t): t is string => typeof t === 'string')
+        .join('
+');
+      // A legal figure may only be repeated back, never produced: the conversation is the whole allowance.
+      const context = [...history.map((t) => t.content), question].join('
+');
+      const safe = guardReply(text, context);
+      if (!safe) {
+        // Not retried. A second model would be refused for the same reason, and the knowledge
+        // base's own answer is the right thing to send. The length says whether it replied at
+        // all; the text itself is built from someone's question and is not logged.
+        console.warn(`[ask] guard refused ${model}'s reply, ${text.length} chars`);
+        return Response.json(local);
+      }
+      return Response.json({
+        id: 'model',
+        kind: 'model',
+        lang: detectLang(question, pageLang),
+        text: latinDigits(safe),
+        mood: 'think',
+      });
+    } catch (err) {
+      // A timeout, or the network. The name only, never the message: a message can carry the URL.
+      console.warn(`[ask] model ${model} did not answer: ${err instanceof Error ? err.name : 'unknown'}`);
     }
-    const data = (await res.json()) as {
-      candidates?: { finishReason?: string; content?: { parts?: { text?: string }[] } }[];
-    };
-    const candidate = data.candidates?.[0];
-    // Half a sentence about the law is worse than none: a reply that ran out of room is dropped.
-    if (candidate?.finishReason && candidate.finishReason !== 'STOP') {
-      console.warn(`[ask] model reply dropped, finishReason ${candidate.finishReason}`);
-      return Response.json(local);
-    }
-    const text = (candidate?.content?.parts ?? [])
-      .map((part) => part.text)
-      .filter((t): t is string => typeof t === 'string')
-      .join('\n');
-    // A legal figure may only be repeated back, never produced: the conversation is the whole allowance.
-    const context = [...history.map((t) => t.content), question].join('\n');
-    const safe = guardReply(text, context);
-    if (!safe) {
-      // Silence here is the hardest of the four to tell apart from an ordinary miss: the model
-      // answered, and the guard found a figure that was never in the conversation. The length says
-      // whether it replied at all; the text itself is someone's question and is not logged.
-      console.warn(`[ask] guard refused the model's reply, ${text.length} chars`);
-      return Response.json(local);
-    }
-    return Response.json({
-      id: 'model',
-      kind: 'model',
-      lang: detectLang(question, pageLang),
-      text: latinDigits(safe),
-      mood: 'think',
-    });
-  } catch {
-    return Response.json(local);
   }
+  return Response.json(local);
 }

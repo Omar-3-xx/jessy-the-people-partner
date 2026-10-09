@@ -61,3 +61,28 @@ test('links and phone numbers are refused', () => {
 test('only the star emoji survives, once', () => {
   assert.equal(tidyEmoji('أهلاً 🌟 بيك 😀 يا فندم 🌟'), 'أهلاً 🌟 بيك يا فندم');
 });
+
+/*
+ * The other half of the guard's job, and the easier one to break by accident: a
+ * reply that is doing exactly what Jessy is allowed to do must get through. All
+ * three below are real answers, word for word, from the model the site calls,
+ * given the real system prompt — asking one clarifying question, offering to
+ * start somewhere, and sending a question about pay to the right desk. None
+ * states a figure of its own. A guard that refuses these refuses every honest
+ * answer, and the site would read as forgetful with nothing in the logs to say
+ * why.
+ */
+test("the model's own in-character replies are let through", () => {
+  const real = [
+    ['انا بشتغل ورديات ليلية، الراحة بتتحسب إزاي؟',
+      'أهلاً بك يا زميلي. سؤالك بخصوص نظام الراحات في الوردية الليلية مش واضح لي تماماً، هل تقصد الراحة الأسبوعية ولا الراحة اليومية بين الورديات؟'],
+    ['مش فاهم حاجة في موضوع الاجازات ده',
+      'أهلاً بيك أنا جيسي وموجودة هنا عشان أساعدك تفهم نظام الإجازات ببساطة. ممكن تقولي إيه أكتر حاجة محيرك أو إيه نوع الإجازة اللي بتسأل عنها عشان أقدر أشرحهالك؟'],
+    ['المرتب بيتحسب إزاي؟',
+      'أنا هنا عشان أساعدك في أسئلة الإجازات بس. موضوع المرتبات خارج اختصاصي تمامًا، يا ريت تسأل الشؤون القانونية في شركتك أو مكتب العمل عشان يفيدوك أكتر.'],
+  ];
+  for (const [question, reply] of real) {
+    assert.deepEqual(legalFigures(reply), [], `no figure of its own: ${reply}`);
+    assert.equal(guardReply(reply, question), reply, `must reach the reader: ${reply}`);
+  }
+});
