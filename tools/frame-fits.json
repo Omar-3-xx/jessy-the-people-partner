@@ -1,0 +1,37 @@
+{
+  "eyes-closed": {
+    "band": "nose+mouth+chin",
+    "dx": -34,
+    "dy": -20,
+    "ncc": 0.3369,
+    "scale": 1.036
+  },
+  "mouth-A": {
+    "band": "eyes+nose",
+    "dx": -32,
+    "dy": -11,
+    "ncc": 0.3296,
+    "scale": 0.972
+  },
+  "mouth-MBP": {
+    "band": "eyes+nose",
+    "dx": -33,
+    "dy": -14,
+    "ncc": 0.3794,
+    "scale": 0.976
+  },
+  "mouth-O": {
+    "band": "eyes+nose",
+    "dx": -32,
+    "dy": -11,
+    "ncc": 0.3572,
+    "scale": 0.972
+  },
+  "mouth-smile": {
+    "band": "eyes+nose",
+    "dx": -32,
+    "dy": -17,
+    "ncc": 0.3633,
+    "scale": 0.988
+  }
+}
