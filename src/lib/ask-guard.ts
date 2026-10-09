@@ -78,6 +78,38 @@ export function tidyEmoji(text: string): string {
     .trim();
 }
 
+/*
+ * A vocative that decides, for the reader, which sex they are.
+ *
+ * Nothing on this site asks a visitor whether they are a man or a woman, and nothing infers it,
+ * so "أهلاً بك يا زميلي" is a guess presented as a greeting -- on a site whose subject is
+ * maternity, nursing and child care, a guess that is wrong a great deal of the time. ask-prompt.ts
+ * asks her not to write one; this is the half of that which can be checked instead of asked for.
+ *
+ * The reply is NOT thrown away for it, unlike an invented article number. "أهلاً بك يا زميلي"
+ * is a good answer carrying one wrong word, so the word goes and the answer stays. Only the
+ * calling form is touched; the rest of the sentence is hers.
+ *
+ * It matches the vocative "يا" and nothing else, because that particle is what makes these words
+ * a form of address. Without it "أختي" and "زميلي" are ordinary nouns a person may be asking
+ * about -- a sister's leave, a colleague's leave -- and striking those would edit her meaning.
+ * "يا فندم" is deliberately absent: it is polite and it commits to nothing.
+ */
+const GENDERED_CALL =
+  /[ 	]*يا\s+(?:زميلي|زميلتي|أستاذ|أستاذة|استاذ|استاذة|مدام|آنسة|انسة|أخي|اخي|أختي|اختي|حبيبي|حبيبتي|عزيزي|عزيزتي|باشا|هانم|بيه)(?![ء-ي])/g;
+
+/** Her reply with any such vocative taken out, and the spacing closed up behind it. */
+export function dropGenderedCall(text: string): string {
+  return text
+    .replace(GENDERED_CALL, '')
+    // The vocative alone is taken, so its comma is left behind: "يا أستاذ، الإجازة" must not
+    // open on a comma, while "بك يا زميلي، ممكن" keeps the one that was doing work.
+    .replace(/^[\s،,.!?؟]+/, '')
+    .replace(/[ 	]{2,}/g, ' ')
+    .replace(/ +([.,!?،؟])/g, '$1')
+    .trim();
+}
+
 /**
  * A model's reply made fit to send, or null when it must not be sent at all.
  * `context` is everything the person and the site have already said; a figure
@@ -86,7 +118,7 @@ export function tidyEmoji(text: string): string {
 export function guardReply(raw: string, context = '', maxChars = 600): string | null {
   const text = raw.replace(/\r/g, '').replace(/\n{3,}/g, '\n\n').trim();
   if (!text || breaksPersona(text) || inventsFigures(text, context)) return null;
-  const tidy = tidyEmoji(text);
+  const tidy = dropGenderedCall(tidyEmoji(text));
   if (!tidy) return null;
   if (tidy.length <= maxChars) return tidy;
   const cut = tidy.slice(0, maxChars);
