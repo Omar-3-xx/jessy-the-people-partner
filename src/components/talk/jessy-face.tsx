@@ -14,6 +14,7 @@ import {
   MOUTHS,
   YAW_WATCH,
   blinkAt,
+  nextSmile,
   pickFrames,
   pickMouth,
 } from '@/lib/talk/frames';
@@ -223,8 +224,7 @@ export function JessyFace({
          * The closed-lipped smile is not a sound, so it is not on the ladder -- flashing it between
          * syllables would be a tic. She wears it while she is listening to you, and it fades.
          */
-        const wants = d.state === 'listening' && !m ? 1 : 0;
-        smile += (wants - smile) * ease(3.2);
+        smile = nextSmile(smile, d.state === 'listening', m !== null, ease(3.2));
         lay(PATCH['mouth-smile'], smile * front);
 
         // Her blink, on its own clock, and never while her head is turned away from you.

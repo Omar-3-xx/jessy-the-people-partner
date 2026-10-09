@@ -25,6 +25,7 @@ import {
   YAW_MIN,
   YAW_WATCH,
   blinkAt,
+  nextSmile,
   pickFrames,
   pickMouth,
 } from '../src/lib/talk/frames.ts';
@@ -194,4 +195,35 @@ test('the patches are laid on the front frame, and only on it', () => {
   for (const c of calls) {
     assert.match(c, /\bfront\b/, `a patch is drawn without fading with the front frame: lay(${c})`);
   }
+});
+
+test('her smile is gone the instant she has something to say', () => {
+  /*
+   * The smile patch and the mouth patches cover the same part of her face. If the smile eased out
+   * while a mouth eased in, a closed mouth would be laid over her open one for about a third of a
+   * second at the start of every answer -- which is the moment you are looking straight at it.
+   */
+  assert.equal(nextSmile(1, true, true, 0.1), 0, 'the smile lingers over her open mouth');
+  assert.equal(nextSmile(1, false, true, 0.1), 0);
+  assert.equal(nextSmile(0.4, true, true, 1), 0);
+
+  // Going the other way it eases, because a smile that snaps on is a twitch.
+  let smile = 0;
+  const climb = [];
+  for (let i = 0; i < 4; i++) {
+    smile = nextSmile(smile, true, false, 0.2);
+    climb.push(smile);
+  }
+  assert.ok(climb[0] > 0 && climb[0] < 0.5, `the smile snapped straight to ${climb[0]}`);
+  for (let i = 1; i < climb.length; i++) {
+    assert.ok(climb[i] > climb[i - 1], 'the smile stopped growing while she listens');
+    assert.ok(climb[i] <= 1, 'the smile overshoots a whole smile');
+  }
+  // And it leaves again when she is no longer being spoken to.
+  assert.ok(nextSmile(climb.at(-1), false, false, 0.2) < climb.at(-1), 'the smile never fades');
+});
+
+test('the page gets the smile from that rule rather than its own', () => {
+  const face = readFileSync(new URL('../src/components/talk/jessy-face.tsx', import.meta.url), 'utf8');
+  assert.match(face, /smile = nextSmile\(/, 'jessy-face.tsx eases the smile on its own again');
 });

@@ -144,6 +144,21 @@ export function pickMouth(shape: { open: number; wide: number }): Mouth {
   return { a: i, b: i + 1, blend: t < 0 ? 0 : t > 1 ? 1 : t };
 }
 
+/**
+ * How far into her closed-lipped smile she is on the next frame.
+ *
+ * It eases in while she listens to you, because a smile that snaps on is a twitch. It leaves at
+ * ONCE the moment she has a sound to make, which is not symmetric and is not an oversight: the
+ * smile patch and the mouth patches cover the same part of her face, so an eased exit would lay
+ * a closed mouth over an open one for about a third of a second at the start of every answer.
+ * The mouth patch arriving in the same frame is what hides the cut.
+ */
+export function nextSmile(current: number, listening: boolean, hasMouth: boolean, ease: number): number {
+  if (hasMouth) return 0;
+  const want = listening ? 1 : 0;
+  return current + (want - current) * ease;
+}
+
 /*
  * Her blink. Eyelids close in about the time it takes to say one letter and open a little slower,
  * and she does it every few seconds, never on a fixed beat -- a blink you can predict is worse
