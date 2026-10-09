@@ -23,7 +23,15 @@ const MAX_CHARS = 500;
 const MAX_TURNS = 8;
 const WINDOW_MS = 5 * 60_000;
 const PER_WINDOW = 20;
-const MODEL = process.env.JESSY_CHAT_MODEL || 'gemini-2.0-flash';
+/*
+ * Pinned, not 'latest': on a site about the law, a model that changes under us changes how
+ * borderline questions are handled. The id was checked against the live API, twice over —
+ * ListModels is not enough on its own. `gemini-2.0-flash` is absent from it altogether, and
+ * `gemini-2.5-flash` IS listed yet answers 404 "no longer available to new users", naming this
+ * one in its place. Both would have 404'd on every call, and the site would have looked merely
+ * forgetful rather than broken.
+ */
+const MODEL = process.env.JESSY_CHAT_MODEL || 'gemini-3.8-flash';
 
 /** Questions per address in the last five minutes. One server's memory: enough to stop a loop, not a crowd. */
 const recent = new Map<string, number[]>();
@@ -101,16 +109,26 @@ export async function POST(req: Request) {
             role: turn.role === 'assistant' ? 'model' : 'user',
             parts: [{ text: turn.content }],
           })),
-          generationConfig: { maxOutputTokens: 300, temperature: 0.2 },
+          generationConfig: {
+            maxOutputTokens: 300,
+            temperature: 0.2,
+            // Gemini 3 spends the output budget on internal reasoning first, which cut every
+            // reply off mid-word. Jessy only has to rephrase, ask what someone means, or say she
+            // does not know, so she is given no thinking budget at all.
+            thinkingConfig: { thinkingBudget: 0 },
+          },
         }),
         signal: AbortSignal.timeout(15_000),
       },
     );
     if (!res.ok) return Response.json(local);
     const data = (await res.json()) as {
-      candidates?: { content?: { parts?: { text?: string }[] } }[];
+      candidates?: { finishReason?: string; content?: { parts?: { text?: string }[] } }[];
     };
-    const text = (data.candidates?.[0]?.content?.parts ?? [])
+    const candidate = data.candidates?.[0];
+    // Half a sentence about the law is worse than none: a reply that ran out of room is dropped.
+    if (candidate?.finishReason && candidate.finishReason !== 'STOP') return Response.json(local);
+    const text = (candidate?.content?.parts ?? [])
       .map((part) => part.text)
       .filter((t): t is string => typeof t === 'string')
       .join('\n');
