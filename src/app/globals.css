@@ -1,0 +1,24 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --ink: #1b2a4a;
+  --paper: #f7f5f2;
+  --gold: #c9a227;
+}
+
+html {
+  background: var(--paper);
+}
+
+body {
+  color: var(--ink);
+  background: var(--paper);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* The answers are read by people scanning for one figure, so give the lines air. */
+.answer {
+  line-height: 2;
+}

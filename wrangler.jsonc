@@ -1,0 +1,20 @@
+// Jessy on Cloudflare Workers, built by the OpenNext adapter.
+// Free plan throughout: no R2, KV, D1, Durable Objects or Images binding.
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "jessy",
+  "main": ".open-next/worker.js",
+  "compatibility_date": "2026-09-01",
+  "compatibility_flags": [
+    "nodejs_compat",
+    // fetch() may only reach public addresses: the one outbound call goes to Gemini.
+    "global_fetch_strictly_public",
+  ],
+  "assets": {
+    "directory": ".open-next/assets",
+    "binding": "ASSETS",
+  },
+  "observability": {
+    "enabled": true,
+  },
+}
