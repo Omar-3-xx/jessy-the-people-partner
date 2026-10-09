@@ -14,6 +14,12 @@
     "directory": ".open-next/assets",
     "binding": "ASSETS",
   },
+  // Jessy's first model. A binding, so there is no API key anywhere: Cloudflare authenticates
+  // the call itself, and the allowance is this account's daily neurons rather than Gemini's
+  // twenty calls a day. Dropping this line puts her back on Gemini alone.
+  "ai": {
+    "binding": "AI",
+  },
   "observability": {
     "enabled": true,
   },
