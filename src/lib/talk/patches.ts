@@ -31,6 +31,24 @@ export const MOUTH_A: MeasuredPatch = {
   seam: 27.0,
 };
 
+export const MOUTH_E: MeasuredPatch = {
+  src: '/images/frames/mouth-E.webp',
+  x: 514,
+  y: 360,
+  w: 225,
+  h: 177,
+  seam: 24.5,
+};
+
+export const MOUTH_FV: MeasuredPatch = {
+  src: '/images/frames/mouth-FV.webp',
+  x: 514,
+  y: 360,
+  w: 225,
+  h: 177,
+  seam: 27.6,
+};
+
 export const MOUTH_MBP: MeasuredPatch = {
   src: '/images/frames/mouth-MBP.webp',
   x: 514,
@@ -47,6 +65,15 @@ export const MOUTH_O: MeasuredPatch = {
   w: 225,
   h: 177,
   seam: 25.8,
+};
+
+export const MOUTH_U: MeasuredPatch = {
+  src: '/images/frames/mouth-U.webp',
+  x: 514,
+  y: 360,
+  w: 225,
+  h: 177,
+  seam: 26.5,
 };
 
 export const MOUTH_SMILE: MeasuredPatch = {

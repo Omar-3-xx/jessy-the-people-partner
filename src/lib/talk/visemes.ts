@@ -17,6 +17,14 @@ export interface MouthShape {
   open: number;
   /** Width of the mouth: 1 as drawn, below 1 rounded ("o"), above 1 stretched ("ee"). */
   wide: number;
+  /**
+   * How far her upper teeth are resting on her lower lip, 0 to 1: "f", "v" and Arabic "ف".
+   *
+   * It is a third channel rather than a point on the open/wide ladder because the "f" mouth is
+   * barely open and not rounded, which is exactly where her resting mouth already sits. On the
+   * ladder it would be indistinguishable from a pause, and every pause would flash her teeth.
+   */
+  lip: number;
 }
 
 export interface MouthKey extends MouthShape {
@@ -26,18 +34,18 @@ export interface MouthKey extends MouthShape {
   i: number;
 }
 
-const CLOSED: MouthShape = { open: 0, wide: 1 };
-const REST: MouthShape = { open: 0.04, wide: 1 };
+const CLOSED: MouthShape = { open: 0, wide: 1, lip: 0 };
+const REST: MouthShape = { open: 0.04, wide: 1, lip: 0 };
 
 const SHAPES = {
-  A: { open: 0.85, wide: 1 },
-  E: { open: 0.4, wide: 1.08 },
-  O: { open: 0.55, wide: 0.72 },
-  U: { open: 0.35, wide: 0.7 },
-  lip: { open: 0.1, wide: 1 },
-  cons: { open: 0.28, wide: 1 },
+  A: { open: 0.85, wide: 1, lip: 0 },
+  E: { open: 0.4, wide: 1.08, lip: 0 },
+  O: { open: 0.55, wide: 0.72, lip: 0 },
+  U: { open: 0.35, wide: 0.7, lip: 0 },
+  lip: { open: 0.1, wide: 1, lip: 1 },
+  cons: { open: 0.28, wide: 1, lip: 0 },
   /** The short vowel Arabic writing leaves out. */
-  schwa: { open: 0.55, wide: 1 },
+  schwa: { open: 0.55, wide: 1, lip: 0 },
 } satisfies Record<string, MouthShape>;
 
 /** One letter: its shape and how long it lasts at rate 1, and whether an Arabic short vowel follows it. */
@@ -120,7 +128,11 @@ export function mouthAt(keys: MouthKey[], t: number): MouthShape {
   const a = keys[lo];
   const b = keys[hi];
   const f = (t - a.t) / Math.max(1, b.t - a.t);
-  return { open: a.open + (b.open - a.open) * f, wide: a.wide + (b.wide - a.wide) * f };
+  return {
+    open: a.open + (b.open - a.open) * f,
+    wide: a.wide + (b.wide - a.wide) * f,
+    lip: a.lip + (b.lip - a.lip) * f,
+  };
 }
 
 /** When, on the timeline, the letter at this index is said: where to jump when the voice reaches a word. */

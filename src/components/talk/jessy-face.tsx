@@ -11,6 +11,7 @@ import {
   FRAMES,
   FRAME_SIZE,
   FRONT,
+  LIP_PATCH,
   MOUTHS,
   YAW_WATCH,
   blinkAt,
@@ -19,7 +20,16 @@ import {
   pickMouth,
 } from '@/lib/talk/frames';
 import type { Patch } from '@/lib/talk/frames';
-import { EYES_CLOSED, MOUTH_A, MOUTH_MBP, MOUTH_O, MOUTH_SMILE } from '@/lib/talk/patches';
+import {
+  EYES_CLOSED,
+  MOUTH_A,
+  MOUTH_E,
+  MOUTH_FV,
+  MOUTH_MBP,
+  MOUTH_O,
+  MOUTH_SMILE,
+  MOUTH_U,
+} from '@/lib/talk/patches';
 import type { MouthShape } from '@/lib/talk/visemes';
 import { cn } from '@/lib/utils';
 
@@ -28,7 +38,7 @@ import { cn } from '@/lib/utils';
  *
  * The old version took one flat render and bent its pixels into a mouth, eyelids and a head turn,
  * and it looked like what it was. This draws his own renders instead: four of them for the turn,
- * and five more for her mouth and her closed eyes. The page only ever chooses which to show.
+ * and eight more for her mouth and her closed eyes. The page only ever chooses which to show.
  *
  * A mouth and a blink are NOT whole frames, though, and that is the one thing worth knowing about
  * this file. Two renders of her are not the same picture with one thing changed -- aligned as well
@@ -74,7 +84,10 @@ const POINTER_IDLE_MS = 5000;
 /** Her patches, by the name the mouth ladder calls them. */
 const PATCH: Record<string, Patch> = {
   'mouth-A': MOUTH_A,
+  'mouth-E': MOUTH_E,
   'mouth-O': MOUTH_O,
+  'mouth-U': MOUTH_U,
+  'mouth-FV': MOUTH_FV,
   'mouth-MBP': MOUTH_MBP,
   'mouth-smile': MOUTH_SMILE,
   'eyes-closed': EYES_CLOSED,
@@ -207,17 +220,23 @@ export function JessyFace({
 
       if (front > 0.004 && !still) {
         /*
-         * Her mouth. The lip sync hands over how open and how wide it is; the ladder in frames.ts
-         * turns that into the two nearest pictures of her mouth and how far between them she is,
+         * Her mouth. The lip sync hands over how open and how wide it is; the ladders in frames.ts
+         * turn that into the two nearest pictures of her mouth and how far between them she is,
          * and they are cross-faded. One rung is the front frame's own closed mouth and draws
          * nothing at all.
+         *
+         * Her "f" is not on a ladder -- it is as closed as a pause and would flash her teeth at
+         * every one -- so it comes over the top on its own channel. At the openness an "f" asks
+         * for, the ladder underneath is already drawing nothing.
          */
         if (m) {
           const mm = pickMouth(m);
-          const under = MOUTHS[mm.a].patch;
-          const over = MOUTHS[mm.b].patch;
+          const rungs = MOUTHS[mm.ladder];
+          const under = rungs[mm.a].patch;
+          const over = rungs[mm.b].patch;
           if (under) lay(PATCH[under], (1 - mm.blend) * front);
           if (over) lay(PATCH[over], mm.blend * front);
+          lay(PATCH[LIP_PATCH], m.lip * front);
         }
 
         /*
