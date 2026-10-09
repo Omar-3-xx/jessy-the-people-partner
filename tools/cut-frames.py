@@ -29,9 +29,19 @@ def cut(name):
     path = os.path.join(SRC, name + ".png")
     im = Image.open(path).convert("RGB")
     a = np.asarray(im, dtype=np.float32)
-    # The three corners that are never her. (She can reach the bottom edge.)
-    corners = np.concatenate([a[:20, :20].reshape(-1, 3), a[:20, -20:].reshape(-1, 3)])
+    # The two corners that are never her. (She can reach the bottom edge.)
+    corners = np.concatenate([a[:60, :60].reshape(-1, 3), a[:60, -60:].reshape(-1, 3)])
     bg = np.median(corners, axis=0)
+    # His renders do not all come back on the SAME grey -- the four heads were (158,158,159) and
+    # the first mouth frame (136,140,147) -- which is why the colour is read off each image rather
+    # than written down. What must hold is that it is FLAT. A contact sheet has cells in its
+    # corners, so its corner sample is not flat, and cutting one by colour distance would make
+    # confetti of it silently. That is the failure that cost a whole render run, so it stops here.
+    spread = float(corners.std(axis=0).max())
+    assert spread < 4.0, (
+        f"{name}: the corners are not one flat colour (sd {spread:.1f}). "
+        "This looks like a contact sheet, not a single render -- ask for it again on its own."
+    )
     dist = np.sqrt(((a - bg) ** 2).sum(axis=2))
     alpha = np.clip((dist - LO) / (HI - LO), 0.0, 1.0)
 
