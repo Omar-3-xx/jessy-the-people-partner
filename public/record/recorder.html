@@ -1,0 +1,313 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>Jessy recorder</title>
+<style>
+:root{--ink:#10233f;--soft:#34475f;--line:#cfd8e3;--paper:#f6f8fb;--card:#fff;--rec:#c62828;--ok:#1b7f4b;--gold:#7a5a00}
+*{box-sizing:border-box}
+body{margin:0;background:var(--paper);color:var(--ink);font-family:"Segoe UI",Tahoma,Arial,sans-serif}
+.wrap{max-width:980px;margin:0 auto;padding-block:20px 48px;padding-inline:16px;display:grid;gap:16px}
+header{display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between}
+h1{font-size:22px;margin:0}
+.how{font-size:15px;line-height:1.7;color:var(--soft);margin:0}
+.how[lang=en]{direction:ltr;text-align:left;font-size:13px}
+button{font:inherit;cursor:pointer;border:2px solid var(--ink);background:var(--card);color:var(--ink);padding:8px 14px;border-radius:8px}
+button:focus-visible{outline:3px solid #f4b400;outline-offset:2px}
+button.primary{background:var(--ink);color:#fff}
+button:disabled{opacity:.4;cursor:default}
+.bar{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.status{font-size:14px;color:var(--soft)}
+.tabs button[aria-pressed=true]{background:var(--ink);color:#fff}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:22px;display:grid;gap:14px}
+.meta{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.n{font:600 15px ui-monospace,Consolas,monospace;background:var(--ink);color:#fff;padding:3px 8px;border-radius:6px;direction:ltr}
+.mood{color:var(--gold);font-size:15px}
+.done{color:var(--ok);font-weight:600;font-size:15px}
+.say{font-size:clamp(24px,4.2vw,38px);line-height:1.7;margin:0;min-height:3.4em}
+.say[dir=ltr]{font-size:clamp(22px,3.6vw,32px)}
+.controls{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+#rec{font-size:20px;padding:12px 26px;border-color:var(--rec);color:var(--rec);min-width:190px}
+#rec.on{background:var(--rec);color:#fff}
+.meter{flex:1 1 160px;height:12px;background:#e8edf3;border-radius:6px;overflow:hidden;direction:ltr}
+.meter i{display:block;height:100%;width:0;background:var(--ok);transition:width 60ms linear}
+.meter.hot i{background:var(--rec)}
+.flash{min-height:1.4em;font-size:15px}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(64px,1fr));gap:6px}
+.grid button{padding:6px 0;font:600 12px ui-monospace,Consolas,monospace;direction:ltr;border-width:1px;border-color:var(--line)}
+.grid button.saved{background:#e3f4ea;border-color:var(--ok);color:var(--ok)}
+.grid button.here{outline:3px solid var(--ink)}
+kbd{font:600 13px ui-monospace,Consolas,monospace;border:1px solid var(--line);border-bottom-width:2px;border-radius:4px;padding:0 5px;background:#fff}
+@media (prefers-reduced-motion:reduce){.meter i{transition:none}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>تسجيل صوت جيسي · Jessy's voice</h1>
+    <div class="bar">
+      <button id="folder" class="primary" type="button">١) اختاري الفولدر</button>
+      <button id="downloads" type="button">أو سجّلي على Downloads</button>
+      <span id="where" class="status">لسه ما اخترتيش مكان الحفظ</span>
+    </div>
+  </header>
+  <p class="how"><b>جيسي</b> بتشرح إجازات قانون العمل المصري لموظف عادي، وصوتك هو صوتها. اقري الجملة في سرّك الأول، وبعدين دوسي <kbd>Space</kbd> واقريها بصوتك العادي، ودوسي <kbd>Space</kbd> تاني لما تخلصي: الجملة بتتحفظ لوحدها وبتروح للي بعدها. غلطتي؟ ارجعي بالسهم وسجّليها تاني بنفس الاسم. <b>متغيّريش صوتك ومتمثّليش</b> — اقري هادية وواثقة زي ما بتشرحي لزميلة، مش بصوت إذاعة. دي حقوق حد في شغله، فمفيش مرح. والأرقام اقريها عربي عادي: «المادة مية أربعة وعشرين»، «خمستاشر يوم». لو اتلخبطي في كلمة، كمّلي وسجّلي الجملة من الأول.</p>
+  <p class="how" lang="en">Jessy explains Egypt's labour-law leave rules to an ordinary employee, and your voice is hers. Read each line silently first, press <kbd>Space</kbd>, read it in your normal voice, and press <kbd>Space</kbd> again: it saves itself and moves on. A mistake? Go back and record it again under the same name. Don't put on a voice and don't perform it — calm and sure, the way you'd explain it to a colleague. Nothing is uploaded: every take is saved on your own computer, and you send them back when you've finished all 28.</p>
+  <div class="bar tabs">
+    <span id="count" class="status"></span>
+  </div>
+  <section class="card" aria-live="polite">
+    <div class="meta"><span id="num" class="n"></span><span id="mood" class="mood"></span><span id="savedMark" class="done"></span></div>
+    <p id="say" class="say"></p>
+    <div class="controls">
+      <button id="rec" type="button">● سجّل <kbd>Space</kbd></button>
+      <button id="play" type="button" disabled>▶ اسمع</button>
+      <button id="prev" type="button">→ اللي قبلها</button>
+      <button id="next" type="button">اللي بعدها ←</button>
+      <div id="meter" class="meter" aria-hidden="true"><i></i></div>
+    </div>
+    <div id="flash" class="flash" role="status"></div>
+  </section>
+  <nav id="grid" class="grid" aria-label="All lines"></nav>
+  <p class="how">لما الـ<b>28</b> جملة كلها تبقى خضرا: لو اخترتي فولدر، ابعتي الفولدر كله مضغوط (ZIP). ولو سجّلتي على Downloads، دوّري على الملفات من <b>ar-001</b> لـ<b>ar-028</b> واضغطيهم وابعتيهم. مش لازم تخلصي في قعدة واحدة — الصفحة بتفتكر اللي اتسجّل لما تفتحي نفس الفولدر تاني.</p>
+</div>
+<script>
+const LINES = [{"file": "ar-001", "lang": "ar", "say": "المادة 124: 15 يوم في السنة الأولى، و21 يوم من السنة التانية. وتبقى 30 يوم لو عدّيت 10 سنين خدمة كاملة عند صاحب عمل أو أكتر، أو لو سنك فوق الـ50. والأشخاص ذوي الإعاقة والأقزام 45 يوم. والأعياد والعطلات الرسمية والراحة الأسبوعية ما بتتحسبش من الرصيد ده.", "mood": {"ar": "هادية وواثقة", "en": "calm and sure"}}, {"file": "ar-002", "lang": "ar", "say": "لو خدمتك أقل من سنة، الإجازة بتتحسب بنسبة المدة اللي اشتغلتها — بشرط تكون عدّيت ستة شهور على الأقل عند صاحب العمل (المادة 124). قبل الستة شهور مفيش رصيد سنوي.", "mood": {"ar": "هادية وواثقة", "en": "calm and sure"}}, {"file": "ar-003", "lang": "ar", "say": "المادة 124 بتزوّد 7 أيام على الإجازة السنوية للي شغال في أعمال خطرة أو مضرة بالصحة أو في مناطق نائية. وقرار وزير العمل رقم 49 لسنة 2026 هو اللي حدد الأعمال والمناطق دي بالاسم.", "mood": {"ar": "هادية وواثقة", "en": "calm and sure"}}, {"file": "ar-004", "lang": "ar", "say": "المادة 125: صاحب العمل هو اللي بيحدد مواعيد الإجازة حسب ظروف الشغل، ومش من حقك تتنازل عنها. لكن لازم تاخد 15 يوم على الأقل في السنة، منهم 6 أيام متصلة. وصاحب العمل ملزم يسوّي الرصيد أو يدفع مقابله كل 3 سنين على الأكثر، ولو الخدمة انتهت وعندك رصيد، تستحق أجره.", "mood": {"ar": "هادية وواثقة", "en": "calm and sure"}}, {"file": "ar-005", "lang": "ar", "say": "خلي بالك: المادة 125 بتقول إنك لو رفضت كتابةً تاخد الإجازة، بيسقط حقك في المقابل المادي بتاعها. يعني الرفض المكتوب بيضيّع الفلوس، مش الإجازة نفسها.", "mood": {"ar": "هادية وواثقة", "en": "calm and sure"}}, {"file": "ar-006", "lang": "ar", "say": "المادة 125 بتمنع تجزئة الإجازة أو تأجيلها أو ضمها بالنسبة للأطفال والأشخاص ذوي الإعاقة والأقزام. دول لازم ياخدوا إجازتهم في وقتها كاملة.", "mood": {"ar": "هادية وواثقة", "en": "calm and sure"}}, {"file": "ar-007", "lang": "ar", "say": "المادة 126 بتديك حاجتين مختلفتين. الأولى: من حقك إنت تحدد ميعاد إجازتك السنوية لو داخل امتحان، بشرط تخطر صاحب العمل قبلها بـ15 يوم. والتانية: إجازة دراسية بأجر عن أيام الامتحان الفعلية، دي ما بتتحسبش من رصيدك السنوي — بشرط تخطره قبلها بـ10 أيام وتثبت إنك دخلت الامتحان فعلاً.", "mood": {"ar": "هادية وواثقة", "en": "calm and sure"}}, {"file": "ar-008", "lang": "ar", "say": "مبروك! المادة 128 بتدي العامل اللي يتولد له مولود إجازة مدفوعة الأجر يوم واحد، يوم الولادة، وما بتتحسبش من رصيدك السنوي. وده بحد أقصى 3 مرات طول مدة خدمتك.", "mood": {"ar": "هادية وواثقة", "en": "calm and sure"}}, {"file": "ar-009", "lang": "ar", "say": "المادة 128: تقدر تنقطع عن الشغل لسبب عارض بحد أقصى 7 أيام في السنة، وبحد أقصى يومين في المرة الواحدة. بس خد بالك — العارضة بتتحسب من رصيد إجازتك السنوية، مش زيادة عليه.", "mood": {"ar": "هادية وواثقة", "en": "calm and sure"}}, {"file": "ar-010", "lang": "ar", "say": "قرار وزير العمل 294 لسنة 2025 حدد 12 مناسبة بأجر كامل: رأس السنة الهجرية، المولد النبوي، عيد الفطر (يومين)، عيد الأضحى (الوقوف بعرفات ويومين)، عيد الميلاد المجيد 7 يناير، ثورة 25 يناير وعيد الشرطة، شم النسيم، تحرير سيناء 25 أبريل، عيد العمال أول مايو، ثورة 30 يونيو، ثورة 23 يوليو، وعيد القوات المسلحة 6 أكتوبر. والأيام دي ما بتتحسبش من إجازتك السنوية.", "mood": {"ar": "هادية وواثقة", "en": "calm and sure"}}, {"file": "ar-011", "lang": "ar", "say": "المادة 129: صاحب العمل يقدر يشغّلك في يوم العطلة لو ظروف الشغل طلبت كده. وساعتها تستحق أجرك عن اليوم ده زائد مِثلَي الأجر، أو يديك يوم تاني بدله — والاختيار ده بيتم بطلب كتابي منك يتحط في ملفك.", "mood": {"ar": "هادية وواثقة", "en": "calm and sure"}}, {"file": "ar-012", "lang": "ar", "say": "المادة 130: لو أمضيت 5 سنين متصلة عند نفس صاحب العمل، ليك إجازة بأجر لمدة شهر لأداء فريضة الحج أو زيارة بيت المقدس. وهي مرة واحدة بس طول مدة خدمتك. والعمرة مش منصوص عليها في المادة دي.", "mood": {"ar": "هادية وواثقة", "en": "calm and sure"}}, {"file": "ar-013", "lang": "ar", "say": "في المنشآت الصناعية اللي يسري عليها القانون 15 لسنة 2017، المادة 131 بتدي سُلّم خاص كل ثلاث سنين خدمة: 3 شهور بأجر كامل، بعدها 6 شهور بـ85% من الأجر، بعدها 3 شهور بـ75% — وده لو الجهة الطبية قررت إن فيه احتمال شفاء. وبيتخصم من اللي صاحب العمل بيدفعه أي تعويض بيدفعه التأمين الاجتماعي.", "mood": {"ar": "هادية وواثقة", "en": "calm and sure"}}, {"file": "ar-014", "lang": "ar", "say": "المادة 131: لو ثبت مرضك أو إصابتك بشكل بيمنعك عن شغلك، ليك إجازة مرضية الجهة الطبية المختصة هي اللي بتحددها. والتعويض عن الأجر — نسبته ومدته — بيتحدد حسب قانون التأمينات الاجتماعية والمعاشات 148 لسنة 2019، مش حسب قانون العمل. لو إنت في منشأة صناعية فيه سُلّم مختلف، اسألني عنه.", "mood": {"ar": "هادية وواثقة", "en": "calm and sure"}}, {"file": "ar-015", "lang": "ar", "say": "المادة 131 بتديك اختيارين: تستفيد من متجمد إجازاتك السنوية جنب المرضية، أو تطلب تحويل الإجازة المرضية لإجازة سنوية لو رصيدك يسمح.", "mood": {"ar": "هادية وواثقة", "en": "calm and sure"}}, {"file": "ar-016", "lang": "ar", "say": "خد بالك إن المادة 132 عكس اللي كتير فاهمينه: دي مش إجازة تمريض. دي بتدي الجهة الطبية الحق إنها تمنعك من مزاولة شغلك لو كنت مخالط لمريض معدٍ من أفراد أسرتك، لمدة مناسبة ما تزيدش عن 3 شهور. والأمراض دي بيحددها قرار من وزير الصحة.", "mood": {"ar": "هادية وواثقة", "en": "calm and sure"}}, {"file": "ar-017", "lang": "ar", "say": "المادة 54 كمان بتقول: ساعات العمل اليومية للحامل بتتخفض ساعة على الأقل من الشهر السادس للحمل. ومش جايز إلزامها بساعات عمل إضافية طول الحمل ولحد 6 شهور بعد الولادة.", "mood": {"ar": "هادية وواثقة", "en": "calm and sure"}}, {"file": "ar-018", "lang": "ar", "say": "المادة 55: بعد إجازة الوضع من حقك ترجعي لوظيفتك أو وظيفة مماثلة من غير ما تخسري أي مزايا. والفصل محظور أثناء إجازة الوضع، ومحظور كمان عقب الرجوع منها، إلا لو اتثبت إن الفصل لسبب مشروع.", "mood": {"ar": "هادية وواثقة", "en": "calm and sure"}}, {"file": "ar-019", "lang": "ar", "say": "المادة 54: إجازة الوضع 4 شهور بأجر كامل، بتشمل المدة قبل الولادة واللي بعدها، على ألا تقل المدة بعد الولادة عن 45 يوم. ولازم شهادة طبية بالتاريخ المرجح للولادة. وهي بحد أقصى 3 مرات طول مدة الخدمة.", "mood": {"ar": "هادية وواثقة", "en": "calm and sure"}}, {"file": "ar-020", "lang": "ar", "say": "المادة 56: خلال السنتين اللي بعد الولادة، ليكي — زيادة على فترة الراحة العادية — فترتين للرضاعة، كل واحدة نص ساعة على الأقل، ومن حقك تضميهم مع بعض. والفترتين دول بيتحسبوا من ساعات العمل ومن غير أي تخفيض في الأجر.", "mood": {"ar": "هادية وواثقة", "en": "calm and sure"}}, {"file": "ar-021", "lang": "ar", "say": "المادة 57: في منشأة بتشغّل 50 عامل أو أكتر، للعاملة الحق في إجازة بدون أجر لمدة ما تجاوزش سنتين لرعاية طفلها. بحد أقصى 3 مرات طول الخدمة، بشرط يكون عدّى على وجودها في المنشأة سنة على الأقل، وما تقلش المدة بين الإجازة الأولى والتانية عن سنتين.", "mood": {"ar": "هادية وواثقة", "en": "calm and sure"}}, {"file": "ar-022", "lang": "ar", "say": "قانون العمل 14 لسنة 2025 ما فيهوش إجازة بدون أجر كحق عام — الإجازة الوحيدة بدون أجر المنصوص عليها هي رعاية الطفل في المادة 57. أي إجازة بدون مرتب غير كده بتبقى اتفاق بينك وبين صاحب العمل، مش حق في القانون.", "mood": {"ar": "هادية وواثقة", "en": "calm and sure"}}, {"file": "ar-023", "lang": "ar", "say": "المادة 127: لو ثبت إنك اشتغلت عند حد تاني أثناء إجازتك، صاحب العمل يقدر يحرمك من أجر الإجازة أو يسترد اللي دفعه — وده من غير إخلال بالجزاء التأديبي.", "mood": {"ar": "هادية وواثقة", "en": "calm and sure"}}, {"file": "ar-024", "lang": "ar", "say": "أنا جيسي، شريكتك في شؤون الموظفين. بجاوب على أسئلة الإجازات في قانون العمل المصري الجديد (القانون 14 لسنة 2025) وقراراته. اسألني عن أي نوع إجازة.", "mood": {"ar": "هادية وواثقة", "en": "calm and sure"}}, {"file": "ar-025", "lang": "ar", "say": "أهلاً بيك! اسألني عن أي إجازة في قانون العمل الجديد — سنوية، عارضة، مرضية، وضع، حج، أو رعاية طفل.", "mood": {"ar": "هادية وواثقة", "en": "calm and sure"}}, {"file": "ar-026", "lang": "ar", "say": "العفو 🌟 لو عندك سؤال تاني عن الإجازات أنا هنا.", "mood": {"ar": "هادية وواثقة", "en": "calm and sure"}}, {"file": "ar-027", "lang": "ar", "say": "أنا بعرض نصوص قانون العمل 14 لسنة 2025 وقراراته زي ما هي، ومش بديك استشارة قانونية. الحالات الفردية بتختلف، فلو الموضوع فيه نزاع ارجع للشؤون القانونية أو مكتب العمل أو محامي.", "mood": {"ar": "هادية وواثقة", "en": "calm and sure"}}, {"file": "ar-028", "lang": "ar", "say": "دي حاجة مش لاقياها في النصوص اللي عندي عن الإجازات. أنا بجاوب من قانون العمل 14 لسنة 2025 بس، فاسأل الشؤون القانونية أو مكتب العمل في الحتة دي.", "mood": {"ar": "هادية وواثقة", "en": "calm and sure"}}];
+const $ = (id) => document.getElementById(id);
+
+/*
+ * A browser only hands out the microphone to a page it trusts. Opened from a link that starts
+ * https:// it always does; opened as a file straight off the disk, some browsers do and some
+ * refuse, and a refusal used to look like a page that was simply broken. So the page says it
+ * itself, before she wastes a take finding out.
+ */
+(function checkBrowser() {
+  const problems = [];
+  if (!window.isSecureContext) problems.push('المتصفح مش هيدي الصفحة دي إذن المايك وهي مفتوحة كملف');
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) problems.push('المتصفح ده مش بيسجّل صوت');
+  if (typeof MediaRecorder === 'undefined') problems.push('المتصفح ده قديم شوية على التسجيل');
+  if (!problems.length) return;
+  const w = document.createElement('p');
+  w.className = 'how';
+  w.style.cssText = 'border:2px solid #b00;border-radius:10px;padding:10px 12px';
+  w.innerHTML = '<b>وقفة قبل ما تبدأي:</b> ' + problems.join('، ') +
+    '. افتحي الصفحة من اللينك اللي المفروض اتبعتلك، أو جرّبي <b>Chrome</b> أو <b>Edge</b> على لابتوب. ' +
+    'لو مفيش لينك، كلّمي اللي باعتلك الملف.';
+  document.querySelector('header').after(w);
+})();
+let lang = 'ar';
+let dir = null;
+// True once she is recording straight to Downloads: either she chose it, or the browser has no
+// folder picker, or it refused. Without this the page could ask for a folder it can never get.
+let useDownloads = false;
+const saved = new Set();
+const takes = new Map();
+let at = { ar: 0, en: 0 };
+let stream = null, rec = null, chunks = [], started = 0, meterOn = false;
+const MIME = ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4'].find((t) => window.MediaRecorder && MediaRecorder.isTypeSupported(t)) || '';
+const EXT = MIME.startsWith('audio/mp4') ? 'm4a' : 'webm';
+const list = () => LINES.filter((l) => l.lang === lang);
+const line = () => list()[at[lang]];
+
+function flash(text, ok) {
+  $('flash').textContent = text;
+  $('flash').style.color = ok ? 'var(--ok)' : 'var(--rec)';
+}
+
+function render() {
+  const l = line();
+  const mine = list();
+  $('num').textContent = l.file;
+  $('mood').textContent = lang === 'ar' ? 'الإحساس: ' + l.mood.ar : 'Mood: ' + l.mood.en;
+  $('say').textContent = l.say;
+  $('say').dir = lang === 'ar' ? 'rtl' : 'ltr';
+  $('savedMark').textContent = saved.has(l.file) ? '✓ متسجّلة' : '';
+  $('play').disabled = !takes.has(l.file);
+  $('prev').disabled = at[lang] === 0;
+  $('next').disabled = at[lang] === mine.length - 1;
+  const n = mine.filter((x) => saved.has(x.file)).length;
+  $('count').textContent = n + ' / ' + mine.length + (lang === 'ar' ? ' متسجّلة' : ' saved');
+  for (const b of document.querySelectorAll('.tabs button')) b.setAttribute('aria-pressed', String(b.dataset.lang === lang));
+  const grid = $('grid');
+  grid.textContent = '';
+  mine.forEach((x, k) => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.textContent = x.file.slice(3);
+    b.title = x.say;
+    if (saved.has(x.file)) b.classList.add('saved');
+    if (k === at[lang]) b.classList.add('here');
+    b.onclick = () => { if (!recording()) { at[lang] = k; flash(''); render(); } };
+    grid.append(b);
+  });
+}
+
+const recording = () => rec && rec.state === 'recording';
+
+function downloadsMode(why) {
+  dir = null;
+  useDownloads = true;
+  $('where').textContent = 'الحفظ في Downloads' + (why ? ' — ' + why : '');
+  flash('تمام. سجّلي عادي: كل جملة هتنزل لوحدها في Downloads باسمها.', true);
+}
+
+async function chooseFolder() {
+  if (!window.showDirectoryPicker) {
+    downloadsMode('المتصفح ده مش بيختار فولدر');
+    return;
+  }
+  try {
+    dir = await window.showDirectoryPicker({ id: 'jessy-voice', mode: 'readwrite' });
+  } catch (err) {
+    // She closed the picker: leave everything as it was. Anything else means the browser will not
+    // give a folder here at all, so Downloads takes over rather than leaving her stuck.
+    if (err && err.name === 'AbortError') return;
+    downloadsMode('المتصفح ما سمحش باختيار فولدر من هنا');
+    return;
+  }
+  useDownloads = false;
+  saved.clear();
+  for await (const [name] of dir.entries()) {
+    const m = name.match(/^((ar|en)-\d{3})\.(webm|m4a|wav|mp3|ogg)$/i);
+    if (m) saved.add(m[1].toLowerCase());
+  }
+  $('where').textContent = 'الفولدر: ' + dir.name;
+  for (const lg of ['ar', 'en']) {
+    const k = LINES.filter((l) => l.lang === lg).findIndex((l) => !saved.has(l.file));
+    at[lg] = k < 0 ? 0 : k;
+  }
+  flash(saved.size ? 'لقيت ' + saved.size + ' متسجّلين قبل كده. كمّل من هنا.' : 'جاهز. دوس Space وابدأ.', true);
+  render();
+}
+
+async function mic() {
+  if (stream) return stream;
+  stream = await navigator.mediaDevices.getUserMedia({ audio: { channelCount: 1, echoCancellation: false, autoGainControl: false, noiseSuppression: true } });
+  const ctx = new AudioContext();
+  const an = ctx.createAnalyser();
+  an.fftSize = 1024;
+  ctx.createMediaStreamSource(stream).connect(an);
+  const buf = new Float32Array(an.fftSize);
+  meterOn = true;
+  const tick = () => {
+    an.getFloatTimeDomainData(buf);
+    let peak = 0;
+    for (const v of buf) peak = Math.max(peak, Math.abs(v));
+    $('meter').firstElementChild.style.width = Math.min(100, peak * 110) + '%';
+    $('meter').classList.toggle('hot', peak > 0.97);
+    if (meterOn) requestAnimationFrame(tick);
+  };
+  tick();
+  return stream;
+}
+
+async function start() {
+  // Chrome and Edge save straight into the folder; a take never goes to Downloads by mistake.
+  if (!dir && !useDownloads && window.showDirectoryPicker) {
+    flash('اختاري مكان الحفظ الأول من الزرارين اللي فوق.', false);
+    $('folder').focus();
+    return;
+  }
+  try {
+    await mic();
+  } catch {
+    flash('الميكروفون مقفول: اسمحي للصفحة تستخدمه من علامة القفل جنب العنوان، وجرّبي تاني.', false);
+    return;
+  }
+  chunks = [];
+  rec = new MediaRecorder(stream, MIME ? { mimeType: MIME } : undefined);
+  rec.ondataavailable = (e) => { if (e.data.size) chunks.push(e.data); };
+  rec.onstop = stopped;
+  rec.start();
+  started = performance.now();
+  $('rec').classList.add('on');
+  $('rec').innerHTML = '■ وقّف <kbd>Space</kbd>';
+  flash('بيسجّل…', true);
+}
+
+function stop() {
+  if (recording()) rec.stop();
+}
+
+async function stopped() {
+  $('rec').classList.remove('on');
+  $('rec').innerHTML = '● سجّل <kbd>Space</kbd>';
+  const l = line();
+  if (performance.now() - started < 500) {
+    flash('قصيرة أوي، سجّلها تاني.', false);
+    return;
+  }
+  const blob = new Blob(chunks, { type: rec.mimeType || MIME });
+  const name = l.file + '.' + EXT;
+  try {
+    if (dir) {
+      const h = await dir.getFileHandle(name, { create: true });
+      const w = await h.createWritable();
+      await w.write(blob);
+      await w.close();
+    } else {
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = name;
+      document.body.append(a);
+      a.click();
+      a.remove();
+    }
+  } catch (err) {
+    flash('ما اتحفظتش: ' + (err && err.message ? err.message : err), false);
+    return;
+  }
+  takes.set(l.file, blob);
+  saved.add(l.file);
+  flash('اتحفظت ' + name + ' ✓', true);
+  const mine = list();
+  const here = at[lang];
+  render();
+  setTimeout(() => {
+    if (!recording() && at[lang] === here && here < mine.length - 1) {
+      at[lang] = here + 1;
+      render();
+    }
+  }, 700);
+}
+
+function play() {
+  const b = takes.get(line().file);
+  if (b) new Audio(URL.createObjectURL(b)).play();
+}
+
+function move(by) {
+  if (recording()) return;
+  const k = at[lang] + by;
+  if (k >= 0 && k < list().length) {
+    at[lang] = k;
+    flash('');
+    render();
+  }
+}
+
+$('folder').onclick = () => chooseFolder().catch(() => downloadsMode('المتصفح ما سمحش باختيار فولدر من هنا'));
+$('downloads').onclick = () => downloadsMode('');
+$('rec').onclick = () => (recording() ? stop() : start());
+$('play').onclick = play;
+$('prev').onclick = () => move(-1);
+$('next').onclick = () => move(1);
+for (const b of document.querySelectorAll('.tabs button')) b.onclick = () => { if (!recording()) { lang = b.dataset.lang; flash(''); render(); } };
+document.addEventListener('keydown', (e) => {
+  if (e.code === 'Space') {
+    // Space is the record key only: a focused button must not also be pressed by it.
+    e.preventDefault();
+    if (!e.repeat) recording() ? stop() : start();
+  } else if (e.key === 'ArrowLeft') move(lang === 'ar' ? 1 : -1);
+  else if (e.key === 'ArrowRight') move(lang === 'ar' ? -1 : 1);
+  else if (e.key === 'p' || e.key === 'P') play();
+});
+document.addEventListener('keyup', (e) => {
+  if (e.code === 'Space') e.preventDefault();
+});
+render();
+</script>
+</body>
+</html>
