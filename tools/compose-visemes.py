@@ -59,6 +59,9 @@ REGION = {
     "mouth-O": (448, 625, 68, 95, 1.15, 0.34, True),
     "mouth-MBP": (448, 625, 68, 95, 1.15, 0.34, True),
     "mouth-smile": (448, 625, 68, 95, 1.15, 0.34, True),
+    "mouth-E": (448, 625, 68, 95, 1.15, 0.34, True),
+    "mouth-U": (448, 625, 68, 95, 1.15, 0.34, True),
+    "mouth-FV": (448, 625, 68, 95, 1.15, 0.34, True),
     "eyes-closed": (320, 630, 55, 180, 1.05, 0.14, False),
 }
 RING = (1.1, 1.6)  # just outside the cut, as a multiple of the edge: where a bad fit shows

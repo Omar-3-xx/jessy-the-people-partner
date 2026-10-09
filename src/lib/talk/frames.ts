@@ -100,30 +100,72 @@ export interface Patch {
 export const FRONT = 1;
 
 /**
- * Her mouth, as the pictures of it that exist, in order of how open it is.
+ * Her mouth, as the pictures of it that exist.
  *
- * The lip sync hands over a shape -- how open the mouth is, and how wide -- for every instant of
- * a sentence (src/lib/talk/visemes.ts). There are four pictures of her mouth and one of them is
- * the front frame's own, so the openness is read off this ladder and the two nearest pictures are
- * cross-faded. That is the same thing the head turn does, for the same reason: a picture held and
- * flicked to the next reads as drawn animation, and nothing is deformed to get there.
+ * The lip sync hands over a shape -- how open the mouth is, how wide, and whether her teeth are
+ * on her lip -- for every instant of a sentence (src/lib/talk/visemes.ts). The openness is read
+ * off a ladder of the pictures that exist and the two nearest are cross-faded. That is the same
+ * thing the head turn does, for the same reason: a picture held and flicked to the next reads as
+ * drawn animation, and nothing is deformed to get there.
  *
- * Her closed-lipped smile is NOT on the ladder. It is a thing she does when she is listening to
- * you, not a sound, and flashing it between syllables would be a tic.
+ * There are TWO ladders, because openness alone cannot tell "oo" from "ee". Both are roughly as
+ * open as each other and they are opposite shapes -- one pursed forward, one stretched sideways
+ * with both rows of teeth -- so one ladder has to choose between them, and before these renders
+ * existed it chose wrong: every "ee" in every sentence came out as three quarters of an "oh".
+ * Which ladder she is on is her lip WIDTH, which is the one thing that does separate them.
+ *
+ * Her closed-lipped smile is NOT on either ladder. It is a thing she does when she is listening
+ * to you, not a sound, and flashing it between syllables would be a tic. Nor is her "f": see
+ * LIP_PATCH below.
  */
-export const MOUTHS: { patch: 'mouth-MBP' | 'mouth-O' | 'mouth-A' | null; open: number }[] = [
-  { patch: 'mouth-MBP', open: 0 },
-  // The front frame's own mouth, closed and faintly smiling. Nothing is drawn over her for this.
-  { patch: null, open: 0.1 },
-  { patch: 'mouth-O', open: 0.5 },
-  { patch: 'mouth-A', open: 0.85 },
-];
+export type MouthPatch = 'mouth-MBP' | 'mouth-U' | 'mouth-O' | 'mouth-E' | 'mouth-A';
 
-/** Below this the mouth is rounded, and she holds the O rather than opening into an "ah". */
+export interface Rung {
+  /** The picture to lay over her, or null for the front frame's own mouth. */
+  patch: MouthPatch | null;
+  /** How open this picture of her mouth is, 0 to 1. The ladder is in this order. */
+  open: number;
+}
+
+/**
+ * Both ladders start closed and end at the most open picture of that shape. The rung with no
+ * patch is the front frame's own mouth, closed and faintly smiling: nothing is drawn over her
+ * for it, which is why the quiet, resting mouth costs nothing at all.
+ */
+export const MOUTHS: { round: Rung[]; wide: Rung[] } = {
+  // Lips rounded and pushed forward. It tops out at the "oh" and never opens into the "ah".
+  round: [
+    { patch: 'mouth-MBP', open: 0 },
+    { patch: null, open: 0.1 },
+    { patch: 'mouth-U', open: 0.35 },
+    { patch: 'mouth-O', open: 0.55 },
+  ],
+  // Lips as drawn or stretched sideways: everything that is not a rounded sound.
+  wide: [
+    { patch: 'mouth-MBP', open: 0 },
+    { patch: null, open: 0.1 },
+    { patch: 'mouth-E', open: 0.4 },
+    { patch: 'mouth-A', open: 0.85 },
+  ],
+};
+
+/** Below this width her lips are rounded, and she is on the ladder that holds the O. */
 export const ROUND_BELOW = 0.85;
 
+/**
+ * Her upper teeth on her lower lip -- "f", "v", Arabic "ف" -- which is not on either ladder.
+ *
+ * That mouth is barely open and not rounded, which is exactly where her resting mouth already
+ * sits, so a rung for it would be indistinguishable from a pause and every pause would flash her
+ * teeth. It is laid over her by its own channel instead (MouthShape.lip), on top of a ladder that
+ * at that openness is drawing nothing anyway.
+ */
+export const LIP_PATCH = 'mouth-FV';
+
 export interface Mouth {
-  /** Index into MOUTHS of the picture underneath. */
+  /** Which ladder her lips are on: rounded, or as drawn. */
+  ladder: 'round' | 'wide';
+  /** Index into that ladder of the picture underneath. */
   a: number;
   /** Index of the one drawn over it. */
   b: number;
@@ -133,15 +175,20 @@ export interface Mouth {
 
 /** Which mouth pictures to draw for a shape the lip sync asked for. */
 export function pickMouth(shape: { open: number; wide: number }): Mouth {
-  // A rounded sound keeps her lips rounded: it must not run on up into the wide-open "ah".
-  const want = shape.wide < ROUND_BELOW ? Math.min(shape.open, MOUTHS[2].open) : shape.open;
-  const lo = MOUTHS[0].open;
-  const hi = MOUTHS[MOUTHS.length - 1].open;
-  const o = want > lo ? (want < hi ? want : hi) : lo;
+  const ladder = shape.wide < ROUND_BELOW ? 'round' : 'wide';
+  const rungs = MOUTHS[ladder];
+  const lo = rungs[0].open;
+  const hi = rungs[rungs.length - 1].open;
+  /*
+   * Written as two upward comparisons so an openness that is not a number lands on the closed
+   * end rather than poisoning the blend: every comparison against NaN is false, and a NaN alpha
+   * would quietly stop her mouth being drawn at all.
+   */
+  const o = shape.open > lo ? (shape.open < hi ? shape.open : hi) : lo;
   let i = 0;
-  while (i < MOUTHS.length - 2 && o > MOUTHS[i + 1].open) i++;
-  const t = (o - MOUTHS[i].open) / (MOUTHS[i + 1].open - MOUTHS[i].open);
-  return { a: i, b: i + 1, blend: t < 0 ? 0 : t > 1 ? 1 : t };
+  while (i < rungs.length - 2 && o > rungs[i + 1].open) i++;
+  const t = (o - rungs[i].open) / (rungs[i + 1].open - rungs[i].open);
+  return { ladder, a: i, b: i + 1, blend: t < 0 ? 0 : t > 1 ? 1 : t };
 }
 
 /**

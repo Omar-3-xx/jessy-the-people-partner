@@ -34,6 +34,7 @@ LOWER = (400, 600, 420, 840)   # nose tip, mouth, chin, jaw
 
 BANDS = {
     "mouth-A": EYES, "mouth-O": EYES, "mouth-MBP": EYES, "mouth-smile": EYES,
+    "mouth-E": EYES, "mouth-U": EYES, "mouth-FV": EYES,
     "eyes-closed": LOWER,
 }
 REACH = 110          # how far the band is allowed to have moved, in pixels
