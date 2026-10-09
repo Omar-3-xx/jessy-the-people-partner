@@ -1,0 +1,31 @@
+# Every pull request and every push to main: the tests, the types and a full
+# production build, on a clean machine. This is the only place the build is
+# checked — the laptop it is written on cannot run a typecheck.
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      # No lockfile yet: the first local npm install writes one, and this step becomes npm ci.
+      - run: npm install --no-audit --no-fund
+      - run: npm test
+      - run: npm run typecheck
+      - run: npm run build
