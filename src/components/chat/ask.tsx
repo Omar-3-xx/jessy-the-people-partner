@@ -15,8 +15,9 @@ import { EAR_MESSAGE, useEars, useVoice } from '@/lib/talk/use-speech';
  * Jessy is a face, not a picture: the driver below is a plain object the face
  * reads sixty times a second, so her mouth moves with the voice and her eyes
  * blink and glance without React re-rendering a thing. She listens through the
- * microphone and answers aloud; both are the browser's own, so nothing is
- * recorded and nothing leaves the device but the question itself.
+ * browser's microphone, and answers in her own recorded voice wherever the
+ * answer came from the law; nothing is recorded and nothing leaves the device
+ * but the question itself.
  */
 
 const SUGGESTIONS = [
@@ -69,10 +70,10 @@ export function Ask() {
   }, [ears.listening, setFace]);
 
   const say = useCallback(
-    (answer: { text: string; link?: KbAnswer['link']; mood?: Mood }) => {
+    (answer: { text: string; link?: KbAnswer['link']; mood?: Mood; id?: string }) => {
       setSaid((prev) => [...prev, { who: 'jessy', text: answer.text, link: answer.link }]);
       const mood = answer.mood ?? 'calm';
-      if (!muted && voice.speak(answer.text)) setFace('speaking', mood);
+      if (!muted && voice.speak(answer.text, answer.id)) setFace('speaking', mood);
       else setFace('idle', mood);
     },
     [muted, voice, setFace],
@@ -96,11 +97,11 @@ export function Ask() {
         });
         const data = (await res.json()) as KbAnswer & { error?: string };
         if (data.error === 'busy') say({ text: 'في أسئلة كتير دلوقتي، جرب تاني بعد شوية.' });
-        else say({ text: data.text, link: data.link, mood: data.mood });
+        else say({ text: data.text, link: data.link, mood: data.mood, id: data.id });
       } catch {
         // The server could not be reached: the same knowledge base, in the browser.
         const local = answerFrom(ENTRIES, FALLBACK, q, 'ar');
-        say({ text: local.text, link: local.link, mood: local.mood });
+        say({ text: local.text, link: local.link, mood: local.mood, id: local.id });
       } finally {
         setTyping(false);
         requestAnimationFrame(() => endRef.current?.scrollIntoView({ behavior: 'smooth' }));
