@@ -261,7 +261,9 @@ export function JessyFace({
 
   return (
     <div role="img" aria-label={label} className={cn('relative', className)}>
-      {/* The same cut-out render, still, until she is drawn, and for good where WebGL is missing. */}
+      {/* The same cut-out render, still, until she is drawn, and for good where WebGL is missing.
+          Framed as the live view frames her — her height fills the stage and she stands on its
+          bottom edge — so the swap from one to the other does not move her. */}
       <Image
         src={PORTRAIT}
         alt=""
@@ -269,7 +271,7 @@ export function JessyFace({
         height={PORTRAIT_SIZE}
         priority
         sizes="(max-width: 768px) 90vw, 46vw"
-        className={cn('absolute inset-0 h-full w-full object-contain transition-opacity duration-300', live && 'opacity-0')}
+        className={cn('absolute inset-0 h-full w-full object-cover object-bottom transition-opacity duration-300', live && 'opacity-0')}
       />
       <canvas
         ref={canvasRef}
