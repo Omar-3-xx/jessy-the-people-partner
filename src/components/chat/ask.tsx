@@ -161,7 +161,10 @@ export function Ask() {
        * is its own white, so where the conversation does run over her shoulder it stays readable.
        */}
       <div className="relative z-10 mx-auto flex min-h-dvh max-w-2xl flex-col px-4 pb-32 pt-[58vh] md:ms-0 md:me-auto md:w-[44vw] md:max-w-xl md:ps-0 md:pe-6 md:pt-10">
-        <header className="text-center md:text-right">
+        {/* On a phone she is the whole screen, so the title lands on her jumper and the grey
+            subtitle under it could not be read at all. It gets the same white the answers get,
+            rather than a band across her: she stays whole, the words stay legible. */}
+        <header className="rounded-2xl bg-white/90 px-4 py-3 text-center shadow-sm backdrop-blur md:bg-transparent md:px-0 md:py-0 md:text-right md:shadow-none md:backdrop-blur-none">
           <div className="flex items-center justify-center gap-2 md:justify-end">
             <h1 className="text-2xl font-bold">جيسي</h1>
             {voice.supported && (
@@ -177,8 +180,8 @@ export function Ask() {
               </button>
             )}
           </div>
-          <p className="mt-1 text-sm opacity-70">شريكتك في شؤون الموظفين — إجازات قانون العمل 14 لسنة 2025</p>
-          <p className="mt-1 h-5 text-xs opacity-55" aria-live="polite">
+          <p className="mt-1 text-sm opacity-80">شريكتك في شؤون الموظفين — إجازات قانون العمل 14 لسنة 2025</p>
+          <p className="mt-1 h-5 text-xs opacity-65" aria-live="polite">
             {CAPTION[state]}
           </p>
         </header>

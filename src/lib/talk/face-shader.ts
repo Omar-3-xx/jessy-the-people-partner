@@ -62,7 +62,7 @@ export const FRAGMENT_SHADER = `
 precision highp float;
 uniform sampler2D uTex;
 uniform vec4 uView;
-uniform float uOpen, uWide, uBlink, uSquint, uBrow, uHead, uBob;
+uniform float uOpen, uWide, uBlink, uSquint, uBrow, uHead, uBob, uYaw;
 uniform vec2 uLook;
 varying vec2 vUv;
 
@@ -74,6 +74,11 @@ const vec2 MC = vec2(646.0, 484.0);
 const float HW = 57.0;
 const float SMILE = 4.0;
 const float CHIN = 552.0;
+// The head as a cylinder, for the turn: the axis it spins about and its radius. The axis is the
+// midpoint of the two eyes; the radius is the half-width of the face itself, not of the hair,
+// because it is the face that has to travel the right distance.
+const float HEAD_X = 636.0;
+const float HEAD_R = 210.0;
 // Each eye's dark lash ring, fitted by least squares. Her head sits about 11 degrees off level,
 // so both eyes carry the same tilt, taken from the line between their centres.
 const vec2 EL = vec2(546.0, 370.0);
@@ -154,6 +159,21 @@ void main() {
   vec2 d0 = p - pivot;
   p = pivot + vec2(cos(a) * d0.x - sin(a) * d0.y, sin(a) * d0.x + cos(a) * d0.y);
   p.y -= uBob * wh;
+
+  /*
+   * And she turns it. Not a slide sideways, which reads as the whole picture sliding: the face is
+   * treated as a cylinder, so a point at texture offset u sits at angle asin(u/R) around it and the
+   * turn moves it to R*sin(that + yaw). Her near cheek sweeps across while the far one bunches up
+   * against the silhouette, which is what a head actually does. The warp is faded out before the
+   * silhouette itself, so her hair keeps its own outline instead of folding over at the edge, and
+   * wh keeps the neck and the body below it still.
+   */
+  float yaw = uYaw * wh;
+  if (abs(yaw) > 0.0005) {
+    float sx = (p.x - HEAD_X) / HEAD_R;
+    float turned = HEAD_R * sin(asin(clamp(sx, -1.0, 1.0)) - yaw);
+    p.x = HEAD_X + mix(turned, p.x - HEAD_X, smoothstep(0.80, 1.0, abs(sx)));
+  }
   vec2 face = p;
 
   // Brows: the fur over each eye lifts.
