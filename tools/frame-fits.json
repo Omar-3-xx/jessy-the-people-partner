@@ -13,6 +13,20 @@
     "ncc": 0.3296,
     "scale": 0.972
   },
+  "mouth-E": {
+    "band": "eyes+nose",
+    "dx": -33,
+    "dy": -12,
+    "ncc": 0.354,
+    "scale": 0.972
+  },
+  "mouth-FV": {
+    "band": "eyes+nose",
+    "dx": -33,
+    "dy": -17,
+    "ncc": 0.3884,
+    "scale": 0.984
+  },
   "mouth-MBP": {
     "band": "eyes+nose",
     "dx": -33,
@@ -26,6 +40,13 @@
     "dy": -11,
     "ncc": 0.3572,
     "scale": 0.972
+  },
+  "mouth-U": {
+    "band": "eyes+nose",
+    "dx": -32,
+    "dy": -17,
+    "ncc": 0.3857,
+    "scale": 0.988
   },
   "mouth-smile": {
     "band": "eyes+nose",
