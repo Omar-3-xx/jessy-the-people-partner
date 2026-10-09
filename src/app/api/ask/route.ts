@@ -94,6 +94,14 @@ export async function POST(req: Request) {
 
   const local = answerFrom(ENTRIES, FALLBACK, question, pageLang);
   const key = process.env.GEMINI_API_KEY;
+  /*
+   * Every way the model can fail here ends at the same fallback sentence, which is right for
+   * whoever asked and useless for us: a site with no key, a 404 on the model id and a reply the
+   * guard threw away are one answer from outside. That is how a wrong model id survived until
+   * the live key was tried. So each of them says which one it was, in Workers Logs
+   * (observability is on in wrangler.jsonc). Never the key itself — only whether there is one.
+   */
+  if (!key) console.warn('[ask] no GEMINI_API_KEY bound: the model is never called');
   if (local.kind !== 'fallback' || !key) return Response.json(local);
 
   const history = cleanHistory(body.history);
@@ -121,13 +129,22 @@ export async function POST(req: Request) {
         signal: AbortSignal.timeout(15_000),
       },
     );
-    if (!res.ok) return Response.json(local);
+    if (!res.ok) {
+      // The body carries Gemini's own reason — a retired model id, a key the project does not
+      // cover, a quota. It is the sentence that would have saved a day, so it is read and logged.
+      const why = await res.text().catch(() => '');
+      console.warn(`[ask] model ${MODEL} answered ${res.status}: ${why.slice(0, 400)}`);
+      return Response.json(local);
+    }
     const data = (await res.json()) as {
       candidates?: { finishReason?: string; content?: { parts?: { text?: string }[] } }[];
     };
     const candidate = data.candidates?.[0];
     // Half a sentence about the law is worse than none: a reply that ran out of room is dropped.
-    if (candidate?.finishReason && candidate.finishReason !== 'STOP') return Response.json(local);
+    if (candidate?.finishReason && candidate.finishReason !== 'STOP') {
+      console.warn(`[ask] model reply dropped, finishReason ${candidate.finishReason}`);
+      return Response.json(local);
+    }
     const text = (candidate?.content?.parts ?? [])
       .map((part) => part.text)
       .filter((t): t is string => typeof t === 'string')
