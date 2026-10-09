@@ -160,14 +160,22 @@ export function Ask() {
       {/*
        * The words keep off her face: below it on a phone, beside her on anything wider. Each bubble
        * is its own white, so where the conversation does run over her shoulder it stays readable.
+       *
+       * The column used to sit flush against the right edge of the window, with no padding on the
+       * reading side at all, which cropped the subtitle at every width above a phone. It now keeps a
+       * gutter, and starts lower down so the block sits optically placed rather than crammed under
+       * the top edge with the rest of the page empty below it.
        */}
-      <div className="relative z-10 mx-auto flex min-h-dvh max-w-2xl flex-col px-4 pb-32 pt-[58vh] md:ms-0 md:me-auto md:w-[44vw] md:max-w-xl md:ps-0 md:pe-6 md:pt-10">
+      <div className="relative z-10 mx-auto flex min-h-dvh max-w-2xl flex-col px-4 pb-36 pt-[58vh] md:ms-0 md:me-auto md:w-[44vw] md:max-w-xl md:ps-10 md:pe-8 md:pt-[12vh]">
         {/* On a phone she is the whole screen, so the title lands on her jumper and the grey
             subtitle under it could not be read at all. It gets the same white the answers get,
             rather than a band across her: she stays whole, the words stay legible. */}
-        <header className="rounded-2xl bg-white/90 px-4 py-3 text-center shadow-sm backdrop-blur md:bg-transparent md:px-0 md:py-0 md:text-right md:shadow-none md:backdrop-blur-none">
-          <div className="flex items-center justify-center gap-2 md:justify-end">
-            <h1 className="text-2xl font-bold">جيسي</h1>
+        <header className="rounded-2xl border border-black/5 bg-white/90 px-5 py-4 text-center shadow-sm backdrop-blur-md md:border-0 md:bg-transparent md:px-0 md:py-0 md:text-right md:shadow-none md:backdrop-blur-none">
+          {/* justify-start, not justify-end: this row is inside dir="rtl", where the flex END is the
+              LEFT. Ending it pushed her name into the middle of the column while every line beneath
+              it began hard against the right edge. */}
+          <div className="flex items-center justify-center gap-2.5 md:justify-start">
+            <h1 className="text-2xl font-bold leading-none tracking-tight md:text-[2.1rem]">جيسي</h1>
             {voice.supported && (
               <button
                 type="button"
@@ -175,29 +183,44 @@ export function Ask() {
                 aria-pressed={muted}
                 aria-label={muted ? 'شغّل صوت جيسي' : 'اقفل صوت جيسي'}
                 title={muted ? 'شغّل صوت جيسي' : 'اقفل صوت جيسي'}
-                className="grid h-8 w-8 place-items-center rounded-full border border-black/10 bg-white/80 transition hover:border-black/30"
+                className="grid h-8 w-8 place-items-center rounded-full border border-black/10 bg-white/80 text-ink/80 shadow-sm transition hover:border-black/25 hover:text-ink hover:shadow"
               >
                 <SoundIcon off={muted} />
               </button>
             )}
           </div>
-          <p className="mt-1 text-sm opacity-80">شريكتك في شؤون الموظفين — إجازات قانون العمل 14 لسنة 2025</p>
-          <p className="mt-1 h-5 text-xs opacity-65" aria-live="polite">
-            {CAPTION[state]}
+
+          {/* A short gold rule under her name: the one place the third colour stands on its own
+              rather than only arriving on hover or underlining a link. */}
+          <span aria-hidden className="mx-auto mt-3 block h-[2px] w-12 rounded-full bg-gold/70 md:ms-0 md:me-auto" />
+
+          {/* The year used to break across two lines and leave "2025" stranded on the second. The
+              non-breaking spaces hold "14 لسنة 2025" together; .balance evens what is left. */}
+          <p className="balance mt-3 text-sm leading-relaxed opacity-85">
+            شريكتك في شؤون الموظفين — إجازات قانون العمل&nbsp;14 لسنة&nbsp;2025
+          </p>
+
+          <p
+            className="mt-2 flex h-5 items-center justify-center gap-2 text-xs opacity-65 md:justify-start"
+            aria-live="polite"
+          >
+            {(state === 'thinking' || state === 'listening') && <Dots />}
+            <span>{CAPTION[state]}</span>
           </p>
         </header>
 
         {said.length === 0 && (
-          <div className="mt-5 grid gap-2">
-            {SUGGESTIONS.map((s) => (
+          <div className="mt-6 grid gap-2.5 sm:grid-cols-2">
+            {SUGGESTIONS.map((s, i) => (
               <button
                 key={s}
                 type="button"
+                style={{ animationDelay: `${60 * i}ms` }}
                 onClick={() => {
                   voice.unlock();
                   void ask(s);
                 }}
-                className="rounded-xl border border-black/10 bg-white/90 px-4 py-3 text-right text-sm shadow-sm backdrop-blur transition hover:border-black/25 hover:shadow"
+                className="chip rise rounded-xl px-4 py-3.5 text-right text-sm leading-relaxed"
               >
                 {s}
               </button>
@@ -205,14 +228,14 @@ export function Ask() {
           </div>
         )}
 
-        <div className="mt-6 space-y-4">
+        <div className="mt-7 space-y-4">
           {said.map((s, i) => (
-            <div key={i} className={s.who === 'me' ? 'text-left' : 'text-right'}>
+            <div key={i} className={`rise ${s.who === 'me' ? 'text-left' : 'text-right'}`}>
               <div
                 className={
                   s.who === 'me'
-                    ? 'inline-block max-w-[85%] rounded-2xl bg-ink px-4 py-3 text-sm text-white shadow-sm'
-                    : 'answer inline-block max-w-[94%] rounded-2xl border border-black/10 bg-white/95 px-4 py-3 text-sm shadow-sm backdrop-blur'
+                    ? 'inline-block max-w-[85%] rounded-2xl rounded-tl-md bg-ink px-4 py-3 text-sm leading-relaxed text-white shadow-[var(--lift-2)]'
+                    : 'answer surface inline-block max-w-[94%] rounded-2xl rounded-tr-md px-4 py-3 text-sm'
                 }
               >
                 {s.text}
@@ -221,7 +244,7 @@ export function Ask() {
                     {' '}
                     <Link
                       href={s.link.href}
-                      className="whitespace-nowrap font-semibold underline decoration-gold decoration-2"
+                      className="whitespace-nowrap font-semibold underline decoration-gold decoration-2 underline-offset-4 transition hover:text-gold"
                     >
                       {s.link.label}
                     </Link>
@@ -231,20 +254,33 @@ export function Ask() {
               {/* Decision 3 of his sheet: the line sits under EVERY answer, not once at the bottom
                   of the page, so it is read with the answer and not scrolled past. Page at /law. */}
               {s.who === 'jessy' && (
-                <p className="mt-1 text-[11px] opacity-55">ده شرح لنص القانون، مش استشارة قانونية.</p>
+                <p className="mt-1.5">
+                  {/* It stays OUTSIDE the bubble, as his sheet has it. But on a phone she fills the
+                      screen and this line was landing on her navy jumper — 11px of navy at 55% on
+                      navy, which is the one line on the page that must never be hard to read. It
+                      gets its own small white behind it, the same white the answer has. */}
+                  <span className="inline-block rounded-md bg-white/85 px-2 py-0.5 text-[11px] text-ink/70 backdrop-blur-sm">
+                    ده شرح لنص القانون، مش استشارة قانونية.
+                  </span>
+                </p>
               )}
             </div>
           ))}
-          {typing && <p className="text-right text-sm opacity-50">جيسي بتفكر…</p>}
+          {typing && (
+            <p className="flex items-center justify-start gap-2 text-sm opacity-55">
+              <Dots />
+              <span>جيسي بتفكر…</span>
+            </p>
+          )}
           <div ref={endRef} />
         </div>
       </div>
 
       <form
         onSubmit={onSubmit}
-        className="fixed inset-x-0 bottom-0 z-20 border-t border-black/10 bg-paper/90 backdrop-blur"
+        className="fixed inset-x-0 bottom-0 z-20 border-t border-black/5 bg-paper/85 shadow-[0_-10px_30px_-20px_rgb(27_42_74_/_0.35)] backdrop-blur-md"
       >
-        <div className="mx-auto flex max-w-2xl items-center gap-2 px-4 py-3">
+        <div className="mx-auto flex max-w-2xl items-center gap-2 px-4 pb-1.5 pt-3">
           {ears.supported && (
             <button
               type="button"
@@ -254,8 +290,8 @@ export function Ask() {
               title={ears.listening ? 'بطّل سماع' : 'اتكلم بدل ما تكتب'}
               className={`grid h-12 w-12 shrink-0 place-items-center rounded-xl border transition ${
                 ears.listening
-                  ? 'animate-pulse border-gold bg-gold/15 text-ink'
-                  : 'border-black/15 bg-white hover:border-black/35'
+                  ? 'listening border-gold bg-gold/10 text-ink'
+                  : 'border-black/15 bg-white shadow-sm hover:border-black/35 hover:shadow'
               }`}
             >
               <MicIcon />
@@ -267,23 +303,37 @@ export function Ask() {
             maxLength={500}
             placeholder={ears.listening ? 'بسمعك…' : 'اسألني عن أي إجازة…'}
             aria-label="سؤالك"
-            className="h-12 flex-1 rounded-xl border border-black/15 bg-white px-4 text-sm outline-none focus:border-ink"
+            className="h-12 flex-1 rounded-xl border border-black/15 bg-white px-4 text-sm shadow-sm outline-none transition placeholder:text-ink/40 focus:border-ink/45 focus:shadow"
           />
           <button
             type="submit"
             disabled={typing || !draft.trim()}
-            className="h-12 shrink-0 rounded-xl bg-ink px-5 text-sm font-semibold text-white disabled:opacity-40"
+            className="h-12 shrink-0 rounded-xl bg-ink px-6 text-sm font-semibold text-white shadow-sm transition hover:-translate-y-px hover:shadow-md active:translate-y-0 disabled:translate-y-0 disabled:opacity-35 disabled:shadow-none"
           >
             اسأل
           </button>
         </div>
-        <p className="pb-2 text-center text-[11px] opacity-60">
-          <Link href="/law" className="underline">
+        <p className="pb-2.5 text-center text-[11px]">
+          <Link
+            href="/law"
+            className="underline decoration-ink/25 underline-offset-4 opacity-60 transition hover:decoration-gold hover:opacity-100"
+          >
             حدود الإجابات دي ونصوص القانون
           </Link>
         </p>
       </form>
     </div>
+  );
+}
+
+/** Three dots that say "working" without a word, and without changing width while they run. */
+function Dots() {
+  return (
+    <span className="dots" aria-hidden>
+      <i />
+      <i />
+      <i />
+    </span>
   );
 }
 
