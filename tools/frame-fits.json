@@ -6,6 +6,13 @@
     "ncc": 0.3369,
     "scale": 1.036
   },
+  "eyes-half": {
+    "band": "nose+mouth+chin",
+    "dx": -35,
+    "dy": -22,
+    "ncc": 0.3373,
+    "scale": 1.04
+  },
   "mouth-A": {
     "band": "eyes+nose",
     "dx": -32,

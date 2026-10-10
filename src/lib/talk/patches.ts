@@ -22,6 +22,15 @@ export const EYES_CLOSED: MeasuredPatch = {
   seam: 48.6,
 };
 
+export const EYES_HALF: MeasuredPatch = {
+  src: '/images/frames/eyes-half.webp',
+  x: 432,
+  y: 250,
+  w: 397,
+  h: 141,
+  seam: 49.1,
+};
+
 export const MOUTH_A: MeasuredPatch = {
   src: '/images/frames/mouth-A.webp',
   x: 514,
