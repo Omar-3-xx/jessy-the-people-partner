@@ -73,6 +73,40 @@ export function pickFrames(yaw: number): Shown {
   return { a: i, b: i + 1, blend: raw < 0 ? 0 : raw > 1 ? 1 : raw };
 }
 
+/**
+ * How far past the edge of a dissolve a resting angle is pushed, so the frame it lands on is the
+ * ONLY one on screen. Landing exactly on the edge leaves a blend of 0.0000001, and a yaw that eases
+ * in from inside the band spends its last moments there as a faint second face.
+ */
+const REST_MARGIN = 0.02;
+
+/**
+ * Where she may come to REST for a wanted angle.
+ *
+ * A turn is allowed to dissolve: she holds one pose, flicks to the next and holds that. What she
+ * must never do is STOP in the middle of the flick. The angle she settles at is her pose plus
+ * where she is glancing, and the glance can land anywhere -- measured on the live page, a glance
+ * of 0.35 to 0.65 of the way to one side leaves her at half a dissolve for the 2.6 to 6.6 seconds
+ * until the next one, which is two heads on one body and read on a phone as a second, washed-out
+ * woman standing behind her. So a wanted angle that falls inside a dissolve is moved to the nearer
+ * side of it, where exactly one render is on screen. Everywhere else it is returned untouched, and
+ * the turn itself still dissolves on the way through.
+ */
+export function restYaw(want: number): number {
+  // Not a number, or no number at all: face the front, as pickFrames does for the same input.
+  if (!Number.isFinite(want)) return 0;
+  const y = want > YAW_MIN ? (want < YAW_MAX ? want : YAW_MAX) : YAW_MIN;
+  const edge = (1 - DISSOLVE) / 2;
+  for (let i = 0; i < FRAMES.length - 1; i++) {
+    const lo = FRAMES[i].yaw;
+    const span = FRAMES[i + 1].yaw - lo;
+    const from = lo + edge * span;
+    const to = lo + (1 - edge) * span;
+    if (y > from && y < to) return y - from < to - y ? from - REST_MARGIN : to + REST_MARGIN;
+  }
+  return y;
+}
+
 /*
  * Her mouth and her blink, as patches.
  *
