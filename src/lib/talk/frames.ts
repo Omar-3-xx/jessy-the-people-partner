@@ -257,3 +257,35 @@ export function blinkAt(ms: number): number {
   if (after < BLINK_OPEN_MS) return 1 - after / BLINK_OPEN_MS;
   return 0;
 }
+
+/** How solid each of the two eye pictures laid over her is, 0 to 1. */
+export interface Lids {
+  /** The half-lidded render: her upper lid across the iris, the lower white still showing. */
+  half: number;
+  /** The shut one. */
+  shut: number;
+}
+
+/**
+ * The pictures to lay over her eyes for a given closure, 0 (open) to 1 (shut).
+ *
+ * Two drawings cross-faded make a ghost: with only open and shut, the middle of a blink shows
+ * her iris THROUGH the lid for about 130 ms either side of the shut frame. A third render, the
+ * lid at half, puts a real picture in the middle, so each dissolve is between two poses that are
+ * only half as far apart -- and, like the head, each dissolve is narrow (DISSOLVE) so one picture
+ * is on screen for most of the time.
+ *
+ * The half render stays solid underneath once it has arrived, and the shut one fades in over it.
+ * Fading the half one OUT as the shut one came in would let the open eye show through between
+ * them, which is the ghost this exists to remove.
+ */
+export function blinkLids(closed: number): Lids {
+  // A closure that is not a number is an open eye, the same way a bad yaw faces the front.
+  const c = closed > 0 ? (closed < 1 ? closed : 1) : 0;
+  const edge = (1 - DISSOLVE) / 2;
+  const settle = (t: number) => {
+    const raw = (t - edge) / DISSOLVE;
+    return raw < 0 ? 0 : raw > 1 ? 1 : raw;
+  };
+  return c <= 0.5 ? { half: settle(c * 2), shut: 0 } : { half: 1, shut: settle((c - 0.5) * 2) };
+}

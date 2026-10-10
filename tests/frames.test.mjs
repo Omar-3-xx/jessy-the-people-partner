@@ -27,6 +27,7 @@ import {
   YAW_MIN,
   YAW_WATCH,
   blinkAt,
+  blinkLids,
   nextSmile,
   pickFrames,
   pickMouth,
@@ -375,6 +376,73 @@ test('a blink shuts and opens and then leaves her eyes alone', () => {
   assert.equal(blinkAt(BLINK_SHUT_MS + BLINK_OPEN_MS), 0, 'the blink never finishes opening');
   assert.equal(blinkAt(10_000), 0, 'her eyes stay shut long after the blink');
   assert.ok(BLINK_OPEN_MS > BLINK_SHUT_MS, 'a real eye opens slower than it closes');
+});
+
+/*
+ * The middle of her blink. With only an open and a shut render, the lid is a cross-fade: her iris
+ * shows THROUGH it for about 130 ms either side of the shut frame. The half-lidded render puts a
+ * real picture in the middle. What must hold is derived below from how much of the OPEN eye is
+ * still visible, never from a list of closures.
+ */
+const lidsSwept = () => Array.from({ length: 1001 }, (_, i) => ({ c: i / 1000, ...blinkLids(i / 1000) }));
+
+/** How much of her open eye can still be seen, 0 to 1: what is left after both pictures are laid over it. */
+const openEyeVisible = ({ half, shut }) => (1 - half) * (1 - shut);
+
+test('a blink passes through her half-lidded render on the way down', () => {
+  assert.deepEqual(blinkLids(0), { half: 0, shut: 0 }, 'an open eye has something laid over it');
+  assert.deepEqual(blinkLids(0.5), { half: 1, shut: 0 }, 'the middle of the blink is not the half-lidded render alone');
+  assert.deepEqual(blinkLids(1), { half: 1, shut: 1 }, 'a shut eye is not the shut render');
+});
+
+test('once her lid has reached half, her open eye is never seen through it again', () => {
+  for (const l of lidsSwept()) {
+    if (l.c >= 0.5) assert.equal(openEyeVisible(l), 0, `at closure ${l.c} the open eye still shows (${JSON.stringify(l)})`);
+  }
+});
+
+test('neither eye picture fades out while she is closing, so nothing is seen coming back', () => {
+  const all = lidsSwept();
+  for (let i = 1; i < all.length; i++) {
+    assert.ok(all[i].half >= all[i - 1].half, `the half-lid fades out at closure ${all[i].c}`);
+    assert.ok(all[i].shut >= all[i - 1].shut, `the shut eye fades out at closure ${all[i].c}`);
+  }
+  for (const l of all) assert.ok(l.half >= 0 && l.half <= 1 && l.shut >= 0 && l.shut <= 1, `an alpha is out of range at ${l.c}`);
+});
+
+test('only one pair of eye pictures dissolves at a time, and at a rendered lid there is none', () => {
+  const partial = (a) => a > 0 && a < 1;
+  for (const l of lidsSwept()) {
+    assert.ok(!(partial(l.half) && partial(l.shut)), `both lids are mid-dissolve at closure ${l.c}`);
+  }
+  for (const c of [0, 0.5, 1]) {
+    const l = blinkLids(c);
+    assert.ok(!partial(l.half) && !partial(l.shut), `a pose she was rendered at is mid-dissolve at ${c}`);
+  }
+});
+
+test('the open eye is a ghost for no more of the blink than the dissolve allows', () => {
+  // The cross-fade it replaces had the open eye on screen for ALL of the first half (alpha 1 - c).
+  const all = lidsSwept();
+  const ghost = all.filter((l) => openEyeVisible(l) > 0.1 && openEyeVisible(l) < 0.9).length / all.length;
+  assert.ok(ghost <= DISSOLVE / 2 + 0.01, `the open eye is half-seen for ${(ghost * 100).toFixed(0)}% of the blink`);
+  assert.ok(ghost > 0, 'the sweep never saw a dissolve, so it proves nothing');
+});
+
+test('a closure that is not a number is an open eye', () => {
+  for (const bad of [NaN, undefined, -1, -Infinity]) assert.deepEqual(blinkLids(bad), { half: 0, shut: 0 }, `${bad} laid something over her`);
+  assert.deepEqual(blinkLids(7), { half: 1, shut: 1 }, 'a closure past shut is not shut');
+});
+
+test('the page lays the half-lidded eye first and the shut one over it, both with the front frame', () => {
+  const face = readFileSync(new URL('../src/components/talk/jessy-face.tsx', import.meta.url), 'utf8');
+  const half = face.search(/lay\(PATCH\['eyes-half'\],[^;]*\bfront\b[^;]*\);/);
+  const shut = face.search(/lay\(PATCH\['eyes-closed'\],[^;]*\bfront\b[^;]*\);/);
+  assert.ok(half >= 0, 'the page never lays the half-lidded eye over her');
+  assert.ok(shut > half, 'the shut eye is laid UNDER the half-lidded one, or not at all');
+  assert.match(face, /blinkLids\(blinkAt\(into\)\)/, 'the page does not take its lids from blinkLids');
+  assert.doesNotMatch(face, /lay\(PATCH\['eyes-closed'\], blinkAt\(/, 'the page blinks by cross-fading open and shut again');
+  assert.ok(face.includes("'eyes-half':"), 'the half-lidded patch is not in the table the page loads from');
 });
 
 test('the patches are laid on the front frame, and only on it', () => {

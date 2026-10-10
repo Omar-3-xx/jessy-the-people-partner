@@ -15,6 +15,7 @@ import {
   MOUTHS,
   YAW_WATCH,
   blinkAt,
+  blinkLids,
   nextSmile,
   pickFrames,
   pickMouth,
@@ -23,6 +24,7 @@ import {
 import type { Patch } from '@/lib/talk/frames';
 import {
   EYES_CLOSED,
+  EYES_HALF,
   MOUTH_A,
   MOUTH_E,
   MOUTH_FV,
@@ -92,6 +94,7 @@ const PATCH: Record<string, Patch> = {
   'mouth-MBP': MOUTH_MBP,
   'mouth-smile': MOUTH_SMILE,
   'eyes-closed': EYES_CLOSED,
+  'eyes-half': EYES_HALF,
 };
 
 /** In a fixed order, so one array of loaded images can be indexed by it. */
@@ -250,7 +253,9 @@ export function JessyFace({
         // Her blink, on its own clock, and never while her head is turned away from you.
         const into = t - blinkAtMs;
         if (into > BLINK_SHUT_MS + BLINK_OPEN_MS) blinkAtMs = t + gap();
-        lay(PATCH['eyes-closed'], blinkAt(into) * front);
+        const lids = blinkLids(blinkAt(into));
+        lay(PATCH['eyes-half'], lids.half * front);
+        lay(PATCH['eyes-closed'], lids.shut * front);
       }
     };
 

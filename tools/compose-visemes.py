@@ -63,6 +63,9 @@ REGION = {
     "mouth-U": (448, 625, 68, 95, 1.15, 0.34, True),
     "mouth-FV": (448, 625, 68, 95, 1.15, 0.34, True),
     "eyes-closed": (320, 630, 55, 180, 1.05, 0.14, False),
+    # The middle of the blink is cut from exactly the same region as the shut eyes, so the two
+    # patches cover the same pixels and one can be laid over the other without a seam moving.
+    "eyes-half": (320, 630, 55, 180, 1.05, 0.14, False),
 }
 RING = (1.1, 1.6)  # just outside the cut, as a multiple of the edge: where a bad fit shows
 
@@ -179,8 +182,18 @@ if __name__ == "__main__":
     base_face = face(base)
     print(f"her face is {base_face.mean() * 100:.1f}% of the front frame\n")
     print(f"{'patch':<14}{'scale':>8}{'dy':>5}{'dx':>5}{'seam':>7}{'at':>12}{'size':>12}{'kb':>7}")
+    import sys
+
+    only = sys.argv[1:]
+    for name in only:
+        assert name in REGION, f"no region for {name}"
+    path = os.path.join(HERE, "patches.json")
     out = {}
-    for name in REGION:
+    if only and os.path.exists(path):
+        # One frame asked for: keep every measurement that was already made for the others.
+        with open(path) as fh:
+            out = json.load(fh)
+    for name in only or REGION:
         r = compose(name, fits[name], base, base_face)
         out[name] = r
         print(f"{name:<14}{r['scale']:>8.3f}{r['dy']:>+5d}{r['dx']:>+5d}{r['seam']:>7.1f}"
