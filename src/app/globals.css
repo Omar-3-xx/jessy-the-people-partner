@@ -2,23 +2,268 @@
 @tailwind components;
 @tailwind utilities;
 
+/*
+ * The look. Three colours and one typeface, same as before: navy ink on warm
+ * paper with a single gold accent. What is added here is craft, not a new
+ * design -- depth instead of flat borders, one visible focus ring, and motion
+ * that is small enough to be felt rather than watched.
+ *
+ * Every rule that moves anything is switched off under prefers-reduced-motion
+ * at the foot of this file. A site read by people who are pregnant, ill or
+ * anxious about their job should never animate at someone who has asked it not
+ * to.
+ */
+
 :root {
   --ink: #1b2a4a;
   --paper: #f7f5f2;
   --gold: #c9a227;
+
+  /* Hairlines are ink at low alpha, never black: black on warm paper reads grey and dirty. */
+  --line: rgb(27 42 74 / 0.1);
+  --line-strong: rgb(27 42 74 / 0.22);
+
+  /* Three steps of elevation. Each is two shadows -- a tight contact shadow and a wide
+     soft one -- because a single blurred shadow reads as fog rather than as height. */
+  --lift-1: 0 1px 2px rgb(27 42 74 / 0.05), 0 1px 3px rgb(27 42 74 / 0.04);
+  --lift-2: 0 1px 2px rgb(27 42 74 / 0.04), 0 6px 16px -6px rgb(27 42 74 / 0.14);
+  --lift-3: 0 2px 6px rgb(27 42 74 / 0.06), 0 14px 34px -10px rgb(27 42 74 / 0.2);
+
+  --ease: cubic-bezier(0.2, 0.7, 0.3, 1);
+
+  color-scheme: light;
 }
 
 html {
   background: var(--paper);
+  scroll-behavior: smooth;
 }
 
 body {
   color: var(--ink);
+  /* FLAT. A background wash was tried here and removed: she is drawn on a canvas whose hair
+     edges are semi-transparent, so a bright radial behind her lit those edges from underneath
+     and haloed them into what read, at a glance, as a second washed-out figure standing beside
+     her. On a phone she covers the whole viewport, so there is nowhere to put a wash that is not
+     behind her. Depth on this page comes from the surfaces and the type, never from the ground. */
   background: var(--paper);
   -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
 }
 
-/* The answers are read by people scanning for one figure, so give the lines air. */
-.answer {
-  line-height: 2;
+::selection {
+  background: rgb(201 162 39 / 0.28);
+  color: var(--ink);
+}
+
+/* One ring, one colour, on everything that takes focus -- and only for the keyboard, so a
+   mouse user never sees it. Before this there was no visible focus anywhere on the page. */
+:focus-visible {
+  outline: 2px solid var(--gold);
+  outline-offset: 2px;
+  border-radius: 0.6rem;
+}
+
+@layer components {
+  /* Arabic numerals in the answers are the thing people are scanning for, so they are lined
+     and tabular: 14 and 21 take the same width and the eye can compare them down a column. */
+  .answer {
+    line-height: 2;
+    font-variant-numeric: tabular-nums;
+    text-wrap: pretty;
+  }
+
+  /* Long Arabic headings break badly at a number -- "14 لسنة" on one line and "2025" alone on
+     the next, which is what the subtitle did at every width. Balanced lines fix it. */
+  .balance {
+    text-wrap: balance;
+  }
+
+  /* A surface: white enough to read over her, with the blur saturated so her navy and her hair
+     warm the panel instead of greying it out. */
+  .surface {
+    background: rgb(255 255 255 / 0.92);
+    backdrop-filter: blur(12px) saturate(1.5);
+    -webkit-backdrop-filter: blur(12px) saturate(1.5);
+    border: 1px solid var(--line);
+    box-shadow: var(--lift-2);
+  }
+
+  /* The suggestion cards. The gold edge arrives on hover from the reading side -- the right,
+     since the page is Arabic -- as a 3px rule, and the card lifts a single pixel. */
+  .chip {
+    position: relative;
+    border: 1px solid var(--line);
+    background: rgb(255 255 255 / 0.92);
+    backdrop-filter: blur(10px) saturate(1.4);
+    -webkit-backdrop-filter: blur(10px) saturate(1.4);
+    box-shadow: var(--lift-1);
+    transition:
+      transform 0.22s var(--ease),
+      box-shadow 0.22s var(--ease),
+      border-color 0.22s var(--ease);
+  }
+
+  .chip::before {
+    content: '';
+    position: absolute;
+    inset-inline-start: 0;
+    inset-block: 0.55rem;
+    width: 3px;
+    border-radius: 3px;
+    background: var(--gold);
+    opacity: 0;
+    transform: scaleY(0.4);
+    transition:
+      opacity 0.22s var(--ease),
+      transform 0.22s var(--ease);
+  }
+
+  .chip:hover {
+    transform: translateY(-1px);
+    border-color: var(--line-strong);
+    box-shadow: var(--lift-2);
+  }
+
+  .chip:hover::before {
+    opacity: 1;
+    transform: scaleY(1);
+  }
+
+  .chip:active {
+    transform: translateY(0);
+    box-shadow: var(--lift-1);
+  }
+
+  /* Each line of the conversation arrives rather than appearing: 10px and 180ms, which is
+     under the threshold at which motion asks to be looked at. */
+  .rise {
+    animation: rise 0.34s var(--ease) both;
+  }
+
+  /* "She is thinking" as three dots rather than as the words. The dots say the same thing in
+     any language and do not change width while they run. */
+  .dots {
+    display: inline-flex;
+    gap: 0.28rem;
+    align-items: center;
+  }
+
+  .dots i {
+    width: 0.36rem;
+    height: 0.36rem;
+    border-radius: 999px;
+    background: currentColor;
+    animation: blinkdot 1.25s ease-in-out infinite;
+  }
+
+  .dots i:nth-child(2) {
+    animation-delay: 0.18s;
+  }
+
+  .dots i:nth-child(3) {
+    animation-delay: 0.36s;
+  }
+
+  /* The microphone while it is listening. The old pulse flashed the whole button; this is a
+     ring that grows out of it and fades, which reads as sound leaving rather than as an alarm. */
+  .listening {
+    position: relative;
+  }
+
+  .listening::after {
+    content: '';
+    position: absolute;
+    inset: -2px;
+    border-radius: inherit;
+    border: 2px solid var(--gold);
+    animation: sonar 1.6s ease-out infinite;
+    pointer-events: none;
+  }
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes blinkdot {
+  0%,
+  70%,
+  100% {
+    opacity: 0.25;
+    transform: translateY(0);
+  }
+  35% {
+    opacity: 1;
+    transform: translateY(-2px);
+  }
+}
+@keyframes sonar {
+  0% {
+    opacity: 0.7;
+    transform: scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.35);
+  }
+}
+/* A thin scrollbar in ink. The default on Windows is a wide pale grey trough that cuts the
+   warm paper with a cold edge down the side of every screen. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgb(27 42 74 / 0.28) transparent;
+}
+
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+*::-webkit-scrollbar-thumb {
+  background: rgb(27 42 74 / 0.24);
+  border-radius: 999px;
+  border: 3px solid transparent;
+  background-clip: content-box;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background: rgb(27 42 74 / 0.4);
+  background-clip: content-box;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  .rise,
+  .dots i,
+  .listening::after {
+    animation: none;
+  }
+
+  .rise {
+    opacity: 1;
+    transform: none;
+  }
+
+  .dots i {
+    opacity: 0.6;
+  }
+
+  .listening::after {
+    opacity: 0.7;
+  }
+
+  .chip,
+  .chip::before {
+    transition: none;
+  }
 }
