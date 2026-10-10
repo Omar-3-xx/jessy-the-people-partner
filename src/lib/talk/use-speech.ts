@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { clipFor } from '@/lib/talk/clips';
+import { parseTrack, trackAt, type MouthTrack } from '@/lib/talk/mouth-track';
 import { mouthAt, mouthTimeline, timeAtChar, timelineLength, type MouthKey, type MouthShape } from '@/lib/talk/visemes';
 import { LOCALE, pauseAfter, pickVoice, pitchFor, sentences, speakable } from '@/lib/talk/voice';
 
@@ -44,6 +45,13 @@ interface Saying {
   keys: MouthKey[];
   /** performance.now() at the timeline's zero, moved whenever the sound says where it is. */
   t0: number;
+  /**
+   * Her mouth as read off this very recording (mouth-track.ts). Once it has loaded it replaces
+   * the text timeline, which stays as the mouth until then and for answers that have no track.
+   */
+  track?: MouthTrack;
+  /** The recording's clock, kept so the mouth can move between the sound's coarse time updates. */
+  clock?: { ct: number; at: number };
 }
 
 export interface Voice {
@@ -214,6 +222,15 @@ export function useVoice(): Voice {
       saying.current = { keys: mouthTimeline(text, rate), t0: performance.now() };
       setSpeaking(true);
       el.src = clip.src;
+      // The mouth read off the recording itself, fetched beside it; the text timeline covers the
+      // moment before it arrives, and the whole answer if it never does.
+      fetch(clip.src.replace(/\.m4a$/, '.mouth'))
+        .then((r) => (r.ok ? r.arrayBuffer() : null))
+        .then((buf) => {
+          const track = buf ? parseTrack(new Uint8Array(buf)) : null;
+          if (track && run.current === mine && saying.current) saying.current.track = track;
+        })
+        .catch(() => {});
       el.ontimeupdate = () => {
         const now = saying.current;
         // Where the sound has actually reached, four times a second: the mouth is pulled onto it.
@@ -248,12 +265,22 @@ export function useVoice(): Voice {
   const mouth = useCallback((): MouthShape | null => {
     const now = saying.current;
     if (!now) return null;
+    if (now.track) {
+      const el = audio();
+      if (el) {
+        // currentTime moves in steps; between steps the mouth rides the page's own clock.
+        const at = performance.now();
+        if (!now.clock || now.clock.ct !== el.currentTime) now.clock = { ct: el.currentTime, at };
+        const ahead = el.paused ? 0 : Math.min(60, at - now.clock.at);
+        return trackAt(now.track, now.clock.ct * 1000 + ahead);
+      }
+    }
     const length = timelineLength(now.keys);
     let t = performance.now() - now.t0;
     // The sound is slower than the estimate: keep the last words moving until it really ends.
     if (t > length && length > 500) t = length - 450 + ((t - length) % 400);
     return mouthAt(now.keys, t);
-  }, []);
+  }, [audio]);
 
   return { supported, speaking, speak, stop, unlock, mouth };
 }
