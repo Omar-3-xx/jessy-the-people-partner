@@ -17,7 +17,8 @@ to file and length. Nothing here runs at build time or in CI — it is run by ha
 when a line is re-recorded, and its output is committed.
 
   python tools/build-voice.py            # voice/raw -> public/voice + clips.ts
-  python tools/build-voice.py <dir>      # from somewhere else, e.g. a fresh download
+  python tools/build-voice.py <dir>      # from somewhere else, e.g. a fresh download, or voice/voice-3
+                                         # (her converted voice: the raw masters stay in voice/raw)
 """
 import json
 import os
@@ -83,7 +84,9 @@ def main():
     rows = []
     for n, kb in enumerate(order, 1):
         clip = "ar-%03d" % n
-        src = os.path.join(RAW, clip + ".webm")
+        # the browser recordings are .webm; the converted voice (tools/voice-convert-kaggle.py) is .flac
+        src = next((p for p in (os.path.join(RAW, clip + ext) for ext in (".webm", ".flac"))
+                    if os.path.exists(p)), os.path.join(RAW, clip + ".webm"))
         if not os.path.exists(src):
             print("%-9s %-22s no recording yet" % (clip, kb))
             continue
@@ -97,6 +100,9 @@ def main():
                           m["input_thresh"], m["target_offset"]))
         else:
             second += "loudnorm=I=%s:TP=%s" % (LUFS, PEAK)
+        # The converted voice has quick peaks that loudnorm's linear mode lets through (one clip
+        # decoded 2.4 dB over full scale); a limiter at -1.5 dBFS holds them under AAC's overshoot.
+        second += ",alimiter=limit=0.84:attack=3:release=40:level=disabled"
         dst = os.path.join(OUT, clip + ".m4a")
         ffmpeg(["-ss", "%.3f" % start, "-to", "%.3f" % end, "-i", src, "-vn",
                 "-af", second, "-ac", "1", "-ar", "44100",
