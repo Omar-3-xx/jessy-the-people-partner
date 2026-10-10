@@ -17,6 +17,7 @@ import test from 'node:test';
 import {
   BLINK_OPEN_MS,
   BLINK_SHUT_MS,
+  DISSOLVE,
   FRAMES,
   FRONT,
   LIP_PATCH,
@@ -29,6 +30,7 @@ import {
   nextSmile,
   pickFrames,
   pickMouth,
+  restYaw,
 } from '../src/lib/talk/frames.ts';
 import * as PATCHES from '../src/lib/talk/patches.ts';
 import { mouthAt as shapeAt, mouthTimeline } from '../src/lib/talk/visemes.ts';
@@ -90,6 +92,114 @@ test('following the mouse never asks for a frame outside the renders', () => {
     const { a, b } = pickFrames(yaw);
     assert.ok(a >= 0 && b < FRAMES.length, `${yaw} indexes outside the frames`);
   }
+});
+
+/*
+ * Where she may come to REST. A turn dissolves two renders into one another, and that is fine for
+ * the instant she is moving. But the angle she settles at is her pose plus a random glance, and a
+ * glance can land in the middle of a dissolve and be held for seconds: two heads on one body, which
+ * is what the live site showed on a phone. Everything below is derived from FRAMES and DISSOLVE, so
+ * it keeps meaning the same thing if either changes.
+ */
+const faceSource = () => readFileSync(new URL('../src/components/talk/jessy-face.tsx', import.meta.url), 'utf8');
+
+/** The open stretches of yaw in which two frames are on screen at once, worked out from the definition. */
+const bands = () => {
+  const edge = (1 - DISSOLVE) / 2;
+  const out = [];
+  for (let i = 0; i < FRAMES.length - 1; i++) {
+    const lo = FRAMES[i].yaw;
+    const span = FRAMES[i + 1].yaw - lo;
+    out.push({ from: lo + edge * span, to: lo + (1 - edge) * span });
+  }
+  return out;
+};
+
+/** The numbers the page uses for each state, read off the page itself so this cannot drift from it. */
+const readRecord = (name) => {
+  const m = faceSource().match(new RegExp(String.raw`const ${name}: Record<FaceState, number> = \{([\s\S]*?)\};`));
+  assert.ok(m, `jessy-face.tsx no longer declares ${name}`);
+  const out = {};
+  for (const [, key, num] of m[1].matchAll(/\b(idle|listening|thinking|speaking):\s*(-?[\d.]+)/g)) out[key] = Number(num);
+  assert.deepEqual(Object.keys(out).sort(), ['idle', 'listening', 'speaking', 'thinking'], `${name} is missing a state`);
+  return out;
+};
+
+test('a dissolve really is a stretch of angles where two frames are on screen', () => {
+  // The premise of everything below. If this stopped holding the sweeps would pass for nothing.
+  for (const { from, to } of bands()) {
+    const mid = pickFrames((from + to) / 2);
+    assert.ok(mid.blend > 0 && mid.blend < 1, `the middle of a band is not a dissolve: ${mid.blend}`);
+  }
+});
+
+test('she never comes to rest in the middle of a dissolve', () => {
+  const turn = readRecord('TURN');
+  const follows = readRecord('FOLLOWS');
+  let rested = 0;
+  for (const state of Object.keys(turn)) {
+    // Every pointer position and every glance, over the whole -1..1 range the page clamps them to.
+    for (let i = 0; i <= 200; i++) {
+      const w = -1 + i / 100;
+      const want = turn[state] + follows[state] * w * YAW_WATCH;
+      const at = restYaw(want);
+      for (const { from, to } of bands()) {
+        assert.ok(
+          !(at > from && at < to),
+          `${state}, pointer ${w.toFixed(2)}: rests at ${at.toFixed(4)}, inside the dissolve ${from.toFixed(3)}..${to.toFixed(3)}`,
+        );
+      }
+      const { blend } = pickFrames(at);
+      assert.ok(blend === 0 || blend === 1, `${state}, pointer ${w.toFixed(2)}: rests at ${at.toFixed(4)} with two frames showing (${blend})`);
+      rested++;
+    }
+  }
+  assert.ok(rested > 400, 'the sweep did not look at anything');
+});
+
+test('the same holds for any angle at all, not only the ones the page asks for today', () => {
+  for (let i = 0; i <= 4000; i++) {
+    const y = YAW_MIN - 0.3 + (i / 4000) * (YAW_MAX - YAW_MIN + 0.6);
+    const at = restYaw(y);
+    assert.ok(at >= YAW_MIN && at <= YAW_MAX, `${y.toFixed(3)} rests outside the frames at ${at}`);
+    const { blend } = pickFrames(at);
+    assert.ok(blend === 0 || blend === 1, `${y.toFixed(3)} rests at ${at.toFixed(4)} with two frames showing (${blend})`);
+  }
+});
+
+test('an angle that is not in a dissolve is left exactly where it was', () => {
+  // Her poses, and the runs of angles around each one, are what she is following you through.
+  for (const f of FRAMES) assert.equal(restYaw(f.yaw), f.yaw, `${f.yaw} was moved`);
+  let kept = 0;
+  for (let i = 0; i <= 1000; i++) {
+    const y = YAW_MIN + (i / 1000) * (YAW_MAX - YAW_MIN);
+    if (bands().some(({ from, to }) => y > from - 0.03 && y < to + 0.03)) continue;
+    // The sweep's own arithmetic can overshoot the last frame by a rounding error; that is not a move.
+    assert.ok(Math.abs(restYaw(y) - y) < 1e-9, `${y.toFixed(3)} was moved though no dissolve is near it`);
+    kept++;
+  }
+  assert.ok(kept > 100, 'the sweep did not look at anything');
+});
+
+test('she is moved to the NEARER side of a dissolve, never across it', () => {
+  for (const { from, to } of bands()) {
+    const mid = (from + to) / 2;
+    assert.ok(restYaw(mid - 0.01) < from, 'just before the middle should rest on the side it came from');
+    assert.ok(restYaw(mid + 0.01) > to, 'just after the middle should rest on the far side');
+    assert.ok(Math.abs(restYaw(from + 0.001) - from) < 0.05, 'a glance at the edge moved her a long way');
+  }
+});
+
+test('an angle that is not a number faces the front instead of poisoning the turn', () => {
+  for (const bad of [NaN, Infinity, -Infinity, undefined]) assert.equal(restYaw(bad), 0, `${bad} did not face the front`);
+});
+
+test('the page rests her through restYaw, so a glance cannot park her mid-dissolve', () => {
+  const face = faceSource();
+  assert.match(face, /restYaw\(TURN\[d\.state\] \+ follow\)/, 'the resting angle no longer goes through restYaw');
+  assert.match(face, /\brestYaw,/, 'restYaw is not imported');
+  // Nothing may steer her by the raw angle again: the unfiltered form is the bug.
+  assert.doesNotMatch(face, /\(TURN\[d\.state\] \+ follow - yaw\)/, 'the page steers her by the raw angle again');
 });
 
 test('the page draws the frames it declares', () => {

@@ -18,6 +18,7 @@ import {
   nextSmile,
   pickFrames,
   pickMouth,
+  restYaw,
 } from '@/lib/talk/frames';
 import type { Patch } from '@/lib/talk/frames';
 import {
@@ -165,7 +166,7 @@ export function JessyFace({
       }
       const watching = aim && t - aimedAt < POINTER_IDLE_MS ? aim.x : wander;
       const follow = still ? 0 : FOLLOWS[d.state] * watching * YAW_WATCH;
-      yaw += (TURN[d.state] + follow - yaw) * ease(d.state === 'thinking' ? 3.4 : 4.6);
+      yaw += (restYaw(TURN[d.state] + follow) - yaw) * ease(d.state === 'thinking' ? 3.4 : 4.6);
 
       /*
        * She breathes, shifts her weight and comes a little nearer to listen: three slow waves that
