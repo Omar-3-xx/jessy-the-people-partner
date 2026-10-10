@@ -92,7 +92,7 @@ def run(cmd, cwd=None, env=None, quiet=False, say=True):
         line = raw.rstrip()
         if not line:
             continue
-        tail = (tail + [line])[-30:]
+        tail = (tail + [line])[-80:]
         if not quiet:
             log('  |', line[:400])
     if p.wait() != 0:
@@ -190,13 +190,19 @@ def install():
     extra = ['--ignore-requires-python'] if sys.version_info >= (3, 13) else []
     pip = [sys.executable, '-m', 'pip', 'install', '-q', '--disable-pip-version-check', '--no-input']
     run(pip + ['-c', f'{WORK}/keep.txt', *extra,
-               'kokoro==0.9.4', 'misaki[en]==0.9.4', 'transformers==4.46.3', 'munch==4.0.0', 'einops==0.8.0',
+               # what kokoro and misaki[en] need. NOT spacy-curated-transformers: it wants thinc 9 (a dev
+               # build with no wheel, so pip tries to compile it and stops on Kaggle's Python 3.13), and the
+               # English phonemizer only uses spacy itself.
+               'spacy', 'loguru', 'addict', 'regex', 'num2words', 'phonemizer-fork', 'espeakng-loader',
+               'transformers==4.46.3', 'munch==4.0.0', 'einops==0.8.0',
                # BigVGAN's loader still takes the arguments huggingface_hub 1.0 dropped
                'huggingface-hub>=0.28.1,<1.0',
                'hydra-core==1.3.2', 'soundfile', 'librosa',
                # what descript-audio-codec needs to import, without its pin of an old protobuf
                'argbind>=0.3.7', 'julius', 'flatten-dict', 'randomname', 'markdown2', 'ffmpy', 'pyloudnorm',
                'pystoi', 'torch-stoi', 'importlib-resources'], quiet=True)
+    # both say Python <3.13 in their metadata and work on it; their other needs are listed above
+    run(pip + ['--no-deps', '--ignore-requires-python', 'kokoro==0.9.4', 'misaki==0.9.4'], quiet=True)
     run(pip + ['--no-deps', 'descript-audio-codec==1.0.0', 'descript-audiotools==0.7.2'], quiet=True)
 
 
