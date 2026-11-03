@@ -7,7 +7,7 @@
   "compatibility_date": "2026-09-01",
   "compatibility_flags": [
     "nodejs_compat",
-    // fetch() may only reach public addresses: the one outbound call goes to Gemini.
+    // fetch() may only reach public addresses: the outbound calls go to Gemini and Tavily.
     "global_fetch_strictly_public",
   ],
   "assets": {

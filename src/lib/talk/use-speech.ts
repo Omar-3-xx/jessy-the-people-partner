@@ -2,23 +2,20 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-import { clipFor } from '@/lib/talk/clips';
-import { parseTrack, trackAt, type MouthTrack } from '@/lib/talk/mouth-track';
 import { mouthAt, mouthTimeline, timeAtChar, timelineLength, type MouthKey, type MouthShape } from '@/lib/talk/visemes';
 import { LOCALE, pauseAfter, pickVoice, pitchFor, sentences, speakable } from '@/lib/talk/voice';
 
 /*
  * Jessy's voice and ears.
  *
- * Her answers from the law are a fixed list, so each one was read aloud once by
- * a real person and it is those recordings she speaks with (clips.ts). Only
- * what a model says has never been recorded, and that alone falls back to
- * speechSynthesis in Egyptian Arabic.
+ * No answer is a fixed line any more, so nothing can be recorded in advance: the
+ * server reads each one aloud as it is written (api/speak), and if it cannot, the
+ * browser's own voice says it in Egyptian Arabic.
  *
  * Either way the mouth is driven off the text through one viseme timeline, and
- * either way the timeline is held to the sound rather than to a timer: a
- * recording's is stretched onto its real length and pulled back onto the audio
- * clock as it plays, and the browser's own voice reports each word so the
+ * either way the timeline is held to the sound rather than to a timer: the
+ * server's is stretched onto the sound's real length and pulled back onto the
+ * audio clock as it plays, and the browser's own voice reports each word so the
  * timeline is pulled onto that. Neither drifts away from what is being said.
  *
  * Her ears are SpeechRecognition. The microphone is open only between the tap
@@ -27,42 +24,25 @@ import { LOCALE, pauseAfter, pickVoice, pitchFor, sentences, speakable } from '@
 
 const LANG = 'ar' as const;
 
-/** What the recordings are in. A browser that cannot play it uses its own voice instead. */
-const CLIP_TYPE = 'audio/mp4; codecs="mp4a.40.2"';
-
-/*
- * Twenty milliseconds of silence, 204 bytes of it. A phone plays audio only from a tap, and
- * only through an element that has already played inside one — so the tap that sends the
- * question plays this through the very element her recordings use, and the answer is allowed
- * to speak when it arrives a second later.
- */
-const SILENCE =
-  'data:audio/wav;base64,UklGRsQAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YaAAAACAgICAgICAgICAgICAgICA' +
-  'gICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAg' +
-  'ICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICA';
+/** The server's voice: bare 16-bit samples, one channel, this many a second. */
+const VOICE_RATE = 24_000;
+/** Gathered into pieces this long before playing, so a slow network stutters less. */
+const PIECE_SECONDS = 0.3;
+/** Her pace in seconds a character, measured, until the stream ending says the real length. */
+const SECONDS_PER_CHAR = 0.105;
 
 interface Saying {
   keys: MouthKey[];
   /** performance.now() at the timeline's zero, moved whenever the sound says where it is. */
   t0: number;
-  /**
-   * Her mouth as read off this very recording (mouth-track.ts). Once it has loaded it replaces
-   * the text timeline, which stays as the mouth until then and for answers that have no track.
-   */
-  track?: MouthTrack;
-  /** The recording's clock, kept so the mouth can move between the sound's coarse time updates. */
-  clock?: { ct: number; at: number };
 }
 
 export interface Voice {
   /** This browser can say an answer aloud at all, by either route. */
   supported: boolean;
   speaking: boolean;
-  /**
-   * Says a reply aloud: her own recording of that answer when the id has one, the browser's
-   * voice otherwise. False when neither can speak, so nothing is said.
-   */
-  speak: (text: string, id?: string) => boolean;
+  /** Says a reply aloud, server first, then the browser. False when neither can speak. */
+  speak: (text: string) => boolean;
   stop: () => void;
   /** Called from a tap: phones let a page play or speak only once a tap has started it. */
   unlock: () => void;
@@ -77,30 +57,27 @@ export function useVoice(): Voice {
   const saying = useRef<Saying | null>(null);
   // Chrome drops an utterance nobody holds before it finishes; this holds them.
   const held = useRef<SpeechSynthesisUtterance[]>([]);
-  const player = useRef<HTMLAudioElement | null>(null);
+  const sound = useRef<AudioContext | null>(null);
+  const playing = useRef<AudioBufferSourceNode[]>([]);
+  const reading = useRef<AbortController | null>(null);
   const timer = useRef<number | undefined>(undefined);
   const run = useRef(0);
   const unlocked = useRef(false);
 
-  /** One element for every recording she ever plays, for the reason given at SILENCE. */
-  const audio = useCallback((): HTMLAudioElement | null => {
-    if (typeof window === 'undefined') return null;
-    if (!player.current) {
-      const el = new Audio();
-      el.preload = 'auto';
-      player.current = el;
-    }
-    return player.current;
+  /** One context for everything she says. A phone lets it run only once a tap has started it. */
+  const context = useCallback((): AudioContext | null => {
+    if (typeof window === 'undefined' || !('AudioContext' in window)) return null;
+    if (!sound.current) sound.current = new AudioContext();
+    return sound.current;
   }, []);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
-    const el = audio();
-    const canPlay = el !== null && el.canPlayType(CLIP_TYPE) !== '';
+    const canPlay = 'AudioContext' in window;
     const load = () => {
       voices.current = 'speechSynthesis' in window ? window.speechSynthesis.getVoices() : [];
-      // Her recordings cover every answer from the law whatever voices this device has, so a
-      // device with no Arabic voice still speaks — it only stays silent on what a model said.
+      // The server's voice works whatever voices this device has, so a device with no Arabic
+      // voice still speaks.
       setSupported(canPlay || voices.current.length === 0 || pickVoice(voices.current, LANG) !== null);
     };
     load();
@@ -109,43 +86,45 @@ export function useVoice(): Voice {
     return () => {
       window.speechSynthesis.removeEventListener?.('voiceschanged', load);
       window.speechSynthesis.cancel();
-      player.current?.pause();
+      reading.current?.abort();
+      void sound.current?.close();
       window.clearTimeout(timer.current);
     };
-  }, [audio]);
+  }, []);
 
   const stop = useCallback(() => {
     run.current++;
     window.clearTimeout(timer.current);
     saying.current = null;
     held.current = [];
-    const el = player.current;
-    if (el) {
-      el.pause();
-      el.ontimeupdate = null;
-      el.onended = null;
-      el.onerror = null;
+    reading.current?.abort();
+    reading.current = null;
+    for (const piece of playing.current) {
+      try {
+        piece.stop();
+      } catch {
+        // A piece that has not started or has already ended has nothing to stop.
+      }
     }
+    playing.current = [];
     if (typeof window !== 'undefined' && 'speechSynthesis' in window) window.speechSynthesis.cancel();
     setSpeaking(false);
   }, []);
 
   const unlock = useCallback(() => {
-    if (unlocked.current || typeof window === 'undefined') return;
+    if (typeof window === 'undefined') return;
+    // Every tap, not only the first: a phone suspends the context again when the page sleeps.
+    void context()?.resume();
+    if (unlocked.current) return;
     unlocked.current = true;
-    const el = audio();
-    if (el) {
-      el.src = SILENCE;
-      void el.play().catch(() => {});
-    }
     if ('speechSynthesis' in window) {
       const u = new SpeechSynthesisUtterance(' ');
       u.volume = 0;
       window.speechSynthesis.speak(u);
     }
-  }, [audio]);
+  }, [context]);
 
-  /** The browser's own voice, sentence by sentence: what a model said, which nobody recorded. */
+  /** The browser's own voice, sentence by sentence, for when the server cannot speak. */
   const sayWithBrowser = useCallback(
     (text: string) => {
       if (typeof window === 'undefined' || !('speechSynthesis' in window)) return false;
@@ -204,83 +183,117 @@ export function useVoice(): Voice {
     [stop],
   );
 
-  /**
-   * Her recording of one answer. False when this browser cannot play the file at all.
-   * `refused` is for the one case that cannot be known in advance — a phone that blocks the
-   * playback — and hands the line back to the browser's own voice.
+  /*
+   * Her voice from the server, played as it arrives. The words are already on the page; the mouth
+   * starts with the first sound, and when the stream ends and the real length is known, the
+   * timeline is stretched onto it. A server that cannot speak hands the answer to the browser's
+   * voice rather than leaving her silent; one that fails halfway just ends there.
    */
-  const sayRecording = useCallback(
-    (clip: { src: string; seconds: number }, text: string, refused: () => void) => {
-      const el = audio();
-      if (!el || el.canPlayType(CLIP_TYPE) === '') return false;
+  const sayFromServer = useCallback(
+    (text: string) => {
+      const ctx = context();
+      if (!ctx) return false;
       stop();
       const mine = run.current;
-      // The timeline is written for an average speaking pace; this is her real one, so it is
-      // stretched onto the recording's own length before a frame is drawn.
-      const plain = mouthTimeline(text);
-      const rate = Math.max(0.3, timelineLength(plain) / Math.max(400, clip.seconds * 1000));
-      saying.current = { keys: mouthTimeline(text, rate), t0: performance.now() };
       setSpeaking(true);
-      el.src = clip.src;
-      // The mouth read off the recording itself, fetched beside it; the text timeline covers the
-      // moment before it arrives, and the whole answer if it never does.
-      fetch(clip.src.replace(/\.m4a$/, '.mouth'))
-        .then((r) => (r.ok ? r.arrayBuffer() : null))
-        .then((buf) => {
-          const track = buf ? parseTrack(new Uint8Array(buf)) : null;
-          if (track && run.current === mine && saying.current) saying.current.track = track;
-        })
-        .catch(() => {});
-      el.ontimeupdate = () => {
-        const now = saying.current;
-        // Where the sound has actually reached, four times a second: the mouth is pulled onto it.
-        if (run.current === mine && now) now.t0 = performance.now() - el.currentTime * 1000;
+      void ctx.resume();
+      const spoken = speakable(text, LANG);
+      const reader = new AbortController();
+      reading.current = reader;
+      const plain = mouthTimeline(spoken);
+      const paceFor = (seconds: number) => Math.max(0.3, timelineLength(plain) / Math.max(400, seconds * 1000));
+
+      let next = 0;
+      let startedAt = 0;
+      let total = 0;
+      const play = (samples: Int16Array) => {
+        const buffer = ctx.createBuffer(1, samples.length, VOICE_RATE);
+        const channel = buffer.getChannelData(0);
+        for (let i = 0; i < samples.length; i++) channel[i] = samples[i] / 32768;
+        const piece = ctx.createBufferSource();
+        piece.buffer = buffer;
+        piece.connect(ctx.destination);
+        if (!startedAt) {
+          next = ctx.currentTime + 0.05;
+          startedAt = next;
+          const guess = spoken.length * SECONDS_PER_CHAR;
+          saying.current = { keys: mouthTimeline(spoken, paceFor(guess)), t0: performance.now() + 50 };
+        }
+        // Fallen behind the network: start from now, and move the mouth by the same gap.
+        if (next < ctx.currentTime) {
+          const gap = ctx.currentTime + 0.02 - next;
+          next += gap;
+          if (saying.current) saying.current.t0 += gap * 1000;
+        }
+        piece.start(next);
+        next += buffer.duration;
+        total += buffer.duration;
+        playing.current.push(piece);
       };
-      const done = () => {
+      const finish = () => {
         if (run.current !== mine) return;
         saying.current = null;
+        playing.current = [];
         setSpeaking(false);
       };
-      el.onended = done;
-      el.onerror = done;
-      void el.play().catch(() => {
-        if (run.current !== mine) return;
-        done();
-        refused();
-      });
+
+      fetch('/api/speak', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ text: spoken }),
+        signal: reader.signal,
+      })
+        .then(async (res) => {
+          if (!res.ok || !res.body) throw new Error(String(res.status));
+          const stream = res.body.getReader();
+          const piece = Math.round(VOICE_RATE * PIECE_SECONDS) * 2;
+          let held = new Uint8Array(0);
+          for (;;) {
+            const { done, value } = await stream.read();
+            if (run.current !== mine) return;
+            if (value) {
+              const joined = new Uint8Array(held.length + value.length);
+              joined.set(held);
+              joined.set(value, held.length);
+              held = joined;
+            }
+            if (held.length >= piece || (done && held.length >= 2)) {
+              const even = held.length - (held.length % 2);
+              // Copied, because an Int16Array needs its bytes on an even start.
+              play(new Int16Array(held.slice(0, even).buffer));
+              held = held.slice(even);
+            }
+            if (done) break;
+          }
+          if (!startedAt) throw new Error('no sound');
+          const now = saying.current;
+          if (now) now.keys = mouthTimeline(spoken, paceFor(total));
+          timer.current = window.setTimeout(finish, Math.max(0, (next - ctx.currentTime) * 1000));
+        })
+        .catch(() => {
+          if (run.current !== mine) return;
+          if (startedAt) finish();
+          else sayWithBrowser(text);
+        });
       return true;
     },
-    [audio, stop],
+    [context, stop, sayWithBrowser],
   );
 
   const speak = useCallback(
-    (text: string, id?: string) => {
-      const recorded = clipFor(id);
-      if (recorded && sayRecording(recorded, text, () => sayWithBrowser(text))) return true;
-      return sayWithBrowser(text);
-    },
-    [sayRecording, sayWithBrowser],
+    (text: string) => sayFromServer(text) || sayWithBrowser(text),
+    [sayFromServer, sayWithBrowser],
   );
 
   const mouth = useCallback((): MouthShape | null => {
     const now = saying.current;
     if (!now) return null;
-    if (now.track) {
-      const el = audio();
-      if (el) {
-        // currentTime moves in steps; between steps the mouth rides the page's own clock.
-        const at = performance.now();
-        if (!now.clock || now.clock.ct !== el.currentTime) now.clock = { ct: el.currentTime, at };
-        const ahead = el.paused ? 0 : Math.min(60, at - now.clock.at);
-        return trackAt(now.track, now.clock.ct * 1000 + ahead);
-      }
-    }
     const length = timelineLength(now.keys);
     let t = performance.now() - now.t0;
     // The sound is slower than the estimate: keep the last words moving until it really ends.
     if (t > length && length > 500) t = length - 450 + ((t - length) % 400);
     return mouthAt(now.keys, t);
-  }, [audio]);
+  }, []);
 
   return { supported, speaking, speak, stop, unlock, mouth };
 }
