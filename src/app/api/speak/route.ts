@@ -8,7 +8,15 @@
  * It only reads what she just said aloud: the text is checked to be short and in Arabic, and the
  * direction above it is fixed here, so this is not a free speech service for the open internet.
  * A refusal is a plain 503 and the page falls back to the browser's voice.
+ *
+ * Her voice for a common question is kept the first time it is said (common.ts), so the free key's
+ * few voice calls are spent on what has never been said.
  */
+
+import { getCloudflareContext } from '@opennextjs/cloudflare';
+
+import { commonId, readAnswer, readVoice, saveVoice, shelfFrom, type Shelf } from '@/lib/law/common';
+import { speakable } from '@/lib/talk/voice';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -71,11 +79,17 @@ function soundOnly(events: ReadableStream<Uint8Array>): ReadableStream<Uint8Arra
   );
 }
 
-export async function POST(req: Request) {
-  const key = process.env.GEMINI_API_KEY;
-  if (!key) return new Response(null, { status: 503 });
+/** The Worker's context, or null under `next dev`, which has no Cloudflare context at all. */
+function cloudflare() {
+  try {
+    return getCloudflareContext();
+  } catch {
+    return null;
+  }
+}
 
-  let body: { text?: unknown };
+export async function POST(req: Request) {
+  let body: { text?: unknown; common?: unknown };
   try {
     body = await req.json();
   } catch {
@@ -87,6 +101,23 @@ export async function POST(req: Request) {
 
   const ip = req.headers.get('cf-connecting-ip') || req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'local';
   if (limited(ip)) return new Response(null, { status: 429 });
+
+  const worker = cloudflare();
+  const shelf = shelfFrom(worker?.env);
+  const common = typeof body.common === 'string' ? commonId(body.common) : null;
+  let keepIn: { shelf: Shelf; id: string } | null = null;
+  if (common && shelf) {
+    const kept = await readAnswer(shelf, common);
+    // Only the words of the kept answer itself: this is not a place to store anything else.
+    if (kept && speakable(kept.text, 'ar') === text) {
+      const sound = await readVoice(shelf, common);
+      if (sound) return new Response(sound, { headers: { 'content-type': 'audio/pcm;rate=24000', 'cache-control': 'no-store' } });
+      keepIn = { shelf, id: common };
+    }
+  }
+
+  const key = process.env.GEMINI_API_KEY;
+  if (!key) return new Response(null, { status: 503 });
 
   for (const model of MODELS) {
     try {
@@ -109,7 +140,13 @@ export async function POST(req: Request) {
         console.warn(`[speak] ${model} answered ${res.status}`);
         continue;
       }
-      return new Response(soundOnly(res.body), {
+      let sound = soundOnly(res.body);
+      if (keepIn && worker) {
+        const [toPage, toShelf] = sound.tee();
+        sound = toPage;
+        worker.ctx.waitUntil(saveVoice(keepIn.shelf, keepIn.id, toShelf, text.length));
+      }
+      return new Response(sound, {
         headers: { 'content-type': 'audio/pcm;rate=24000', 'cache-control': 'no-store' },
       });
     } catch (err) {
