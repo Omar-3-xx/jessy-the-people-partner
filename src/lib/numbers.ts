@@ -32,3 +32,15 @@ export function parseNumber(raw: string): number | null {
   if (!/^\d{1,3}(\.\d{1,2})?$/.test(s)) return null;
   return Number(s);
 }
+
+/** An amount of money or a count: larger than parseNumber takes, with thousands marks and a unit allowed. */
+export function readAmount(raw: string): number | null {
+  const s = latinDigits(raw)
+    .replace(/\s*(جنيه|ج\.م)\s*$/, '')
+    .replace(/٬/g, '')
+    .replace(/,(?=\d{3}(?:\D|$))/g, '')
+    .replace(/,/g, '.')
+    .trim();
+  if (!/^\d{1,10}(\.\d{1,2})?$/.test(s)) return null;
+  return Number(s);
+}

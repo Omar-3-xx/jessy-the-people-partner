@@ -244,6 +244,11 @@ export function Ask() {
                 </button>
               </p>
             )}
+            <p className="mt-2 text-center md:text-right">
+              <Link href="/rights" className="rounded-md bg-white/85 px-2 py-0.5 text-sm underline decoration-gold underline-offset-4">
+                احسب إجازتك وأوفر تايمك ومستحقاتك
+              </Link>
+            </p>
           </>
         )}
 
@@ -371,7 +376,13 @@ export function Ask() {
             اسأل
           </button>
         </div>
-        <p className="pb-2.5 text-center text-[11px]">
+        <p className="flex justify-center gap-4 pb-2.5 text-[11px]">
+          <Link
+            href="/rights"
+            className="underline decoration-ink/25 underline-offset-4 opacity-60 transition hover:decoration-gold hover:opacity-100"
+          >
+            احسب حقوقك
+          </Link>
           <Link
             href="/law"
             className="underline decoration-ink/25 underline-offset-4 opacity-60 transition hover:decoration-gold hover:opacity-100"
