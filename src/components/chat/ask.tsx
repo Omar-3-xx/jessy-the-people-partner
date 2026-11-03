@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react';
 
 import { JessyFace, createFaceDriver, type FaceDriver, type FaceState } from '@/components/talk/jessy-face';
+import { postAsHuman } from '@/lib/human';
 import type { KbAnswer, Mood } from '@/lib/kb';
 import { FIRST_QUESTIONS, MORE_QUESTIONS } from '@/lib/law/common-questions';
 import { EAR_MESSAGE, useEars, useVoice } from '@/lib/talk/use-speech';
@@ -88,13 +89,10 @@ export function Ask() {
       setTyping(true);
       setFace('thinking');
       try {
-        const res = await fetch('/api/ask', {
-          method: 'POST',
-          headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({ question: q, lang: 'ar', history }),
-        });
+        const res = await postAsHuman('/api/ask', { question: q, lang: 'ar', history });
         const data = (await res.json()) as KbAnswer & { error?: string; sources?: Source[]; web?: WebSource[]; common?: string };
         if (data.error === 'busy') say({ text: 'في أسئلة كتير دلوقتي، جرب تاني بعد شوية.' });
+        else if (data.error === 'human') say({ text: 'مقدرتش أتأكد إن اللي بيسأل شخص مش برنامج. حدّث الصفحة وجرب تاني.' });
         else say({ text: data.text, link: data.link, mood: data.mood, sources: data.sources, web: data.web, common: data.common });
       } catch {
         say({ text: 'مش قادرة أوصل لنص القانون دلوقتي، النت عندك أو عندي فيه مشكلة. جرب تاني كمان شوية.' });
