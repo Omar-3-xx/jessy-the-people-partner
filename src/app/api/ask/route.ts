@@ -16,7 +16,8 @@ import { aiBindingFrom } from '@/lib/workers-ai';
  * in tests/ runs. Every exit says which model answered and why any before it did not, in Workers
  * Logs (observability is on in wrangler.jsonc). Never the key, never the person's words.
  *
- * Nothing anyone typed is stored. Only the answers to the fixed common questions are kept (common.ts).
+ * Nothing anyone typed is stored here. Only the answers to the fixed common questions are kept
+ * (common.ts). A person can choose to send an answer back as wrong, which is api/report.
  */
 
 export const runtime = 'nodejs';

@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react';
 
+import { ReportWrong } from '@/components/chat/report-wrong';
 import { JessyFace, createFaceDriver, type FaceDriver, type FaceState } from '@/components/talk/jessy-face';
 import { postAsHuman } from '@/lib/human';
 import type { KbAnswer, Mood } from '@/lib/kb';
@@ -24,7 +25,8 @@ import { EAR_MESSAGE, useEars, useVoice } from '@/lib/talk/use-speech';
 
 type Source = { name: string; href: string; chapter?: string; text: string };
 type WebSource = { title: string; url: string };
-type Said = { who: 'me' | 'jessy'; text: string; link?: KbAnswer['link']; sources?: Source[]; web?: WebSource[] };
+/** `asked` is the question a real answer was given to. Her apologies and error lines have none. */
+type Said = { who: 'me' | 'jessy'; text: string; link?: KbAnswer['link']; sources?: Source[]; web?: WebSource[]; asked?: string };
 
 /** What she is doing, in words, under the face. */
 const CAPTION: Record<FaceState, string> = {
@@ -66,10 +68,10 @@ export function Ask() {
   }, [ears.listening, setFace]);
 
   const say = useCallback(
-    (answer: { text: string; link?: KbAnswer['link']; mood?: Mood; sources?: Source[]; web?: WebSource[]; common?: string }) => {
+    (answer: { text: string; link?: KbAnswer['link']; mood?: Mood; sources?: Source[]; web?: WebSource[]; common?: string; asked?: string }) => {
       setSaid((prev) => [
         ...prev,
-        { who: 'jessy', text: answer.text, link: answer.link, sources: answer.sources, web: answer.web },
+        { who: 'jessy', text: answer.text, link: answer.link, sources: answer.sources, web: answer.web, asked: answer.asked },
       ]);
       const mood = answer.mood ?? 'calm';
       if (!muted && voice.speak(answer.text, answer.common)) setFace('speaking', mood);
@@ -93,7 +95,7 @@ export function Ask() {
         const data = (await res.json()) as KbAnswer & { error?: string; sources?: Source[]; web?: WebSource[]; common?: string };
         if (data.error === 'busy') say({ text: 'في أسئلة كتير دلوقتي، جرب تاني بعد شوية.' });
         else if (data.error === 'human') say({ text: 'مقدرتش أتأكد إن اللي بيسأل شخص مش برنامج. حدّث الصفحة وجرب تاني.' });
-        else say({ text: data.text, link: data.link, mood: data.mood, sources: data.sources, web: data.web, common: data.common });
+        else say({ text: data.text, link: data.link, mood: data.mood, sources: data.sources, web: data.web, common: data.common, asked: q });
       } catch {
         say({ text: 'مش قادرة أوصل لنص القانون دلوقتي، النت عندك أو عندي فيه مشكلة. جرب تاني كمان شوية.' });
       } finally {
@@ -273,6 +275,11 @@ export function Ask() {
                     ده شرح لنص القانون، مش استشارة قانونية.
                   </span>
                 </p>
+              )}
+              {s.asked && (
+                <div className="mt-1.5">
+                  <ReportWrong question={s.asked} answer={s.text} articles={(s.sources ?? []).map((source) => source.name)} />
+                </div>
               )}
             </div>
           ))}
