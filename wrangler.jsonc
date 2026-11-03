@@ -5,8 +5,6 @@
   "name": "jessy-people-partner",
   "main": ".open-next/worker.js",
   "compatibility_date": "2026-09-01",
-  // Her web search key is set on the Worker's page, not here. Without this, every deploy deletes it.
-  "keep_vars": true,
   "compatibility_flags": [
     "nodejs_compat",
     // fetch() may only reach public addresses: the outbound calls go to Gemini and Tavily.
