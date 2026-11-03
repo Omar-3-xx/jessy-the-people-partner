@@ -5,8 +5,12 @@
  * in 5, where waiting for the whole file would leave her silent for those 5. The page plays the
  * chunks through Web Audio (use-speech.ts).
  *
- * It only reads what she just said aloud: the text is checked to be short and in Arabic, and the
- * direction above it is fixed here, so this is not a free speech service for the open internet.
+ * It only reads what she just said aloud: the text is checked to be short and in Arabic, so this
+ * is not a free speech service for the open internet.
+ *
+ * Only her words go to the model. It reads whatever text it gets word for word, so a direction in
+ * English placed above them was read out in English before every answer (4 Nov 2026).
+ *
  * A refusal is a plain 503 and the page falls back to the browser's voice.
  *
  * Her voice for a common question is kept the first time it is said (common.ts), so the free key's
@@ -29,11 +33,6 @@ const PER_WINDOW = 20;
 const TIMEOUT_MS = 120_000;
 const VOICE = process.env.JESSY_VOICE || 'Sulafat';
 const MODELS = (process.env.JESSY_VOICE_MODEL || 'gemini-3.8-flash-tts,gemini-3.8-flash-lite-tts').split(',');
-
-const DIRECTION =
-  'Read this in natural Cairene Egyptian Arabic, the way a warm, confident, senior HR partner speaks to a colleague: ' +
-  'calm, clear, unhurried, with a real smile in the voice. Pronounce ج as the hard Egyptian g. ' +
-  'Do not sound like a news reader or an advert.\n\n';
 
 const recent = new Map<string, number[]>();
 
@@ -132,7 +131,7 @@ export async function POST(req: Request) {
           method: 'POST',
           headers: { 'content-type': 'application/json', 'x-goog-api-key': key },
           body: JSON.stringify({
-            contents: [{ parts: [{ text: DIRECTION + text }] }],
+            contents: [{ parts: [{ text }] }],
             generationConfig: {
               responseModalities: ['AUDIO'],
               speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: VOICE } } },
