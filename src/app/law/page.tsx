@@ -1,6 +1,8 @@
 import Link from 'next/link';
 import type { Metadata } from 'next';
 
+import { LAW } from '@/lib/law/index';
+
 export const metadata: Metadata = {
   title: 'المصدر وإخلاء المسؤولية — جيسي',
   description: 'من فين جايه إجابات جيسي، وإيه حدودها.',
@@ -18,12 +20,28 @@ export const metadata: Metadata = {
  */
 
 const SOURCES = [
-  ['قانون العمل', 'القانون رقم 14 لسنة 2025 — الفصل الخامس: الإجازات (المواد 124 إلى 133)، والمواد 54 إلى 57 في شأن المرأة العاملة.'],
-  ['العطلات والأعياد', 'قرار وزير العمل رقم 294 لسنة 2025 — تحديد 12 مناسبة تُعتبر إجازة بأجر كامل.'],
-  ['الأعمال الخطرة', 'قرار وزير العمل رقم 49 لسنة 2026 — الأعمال الخطرة والصعبة والمناطق النائية التي تستحق زيادة 7 أيام.'],
-  ['التعويض عن الأجر في المرض', 'قانون التأمينات الاجتماعية والمعاشات رقم 148 لسنة 2019 — وهو اللي بيحدد نسبة ومدة التعويض في الحالة العامة.'],
-  ['سن الطفل في رعاية الطفل', 'قانون الطفل رقم 12 لسنة 1996، المادة 72 فقرة ثانية — المادة 57 من قانون العمل بتحيل عليها.'],
+  ['قانون العمل', 'القانون رقم 14 لسنة 2025 — مواد الإصدار الثلاث عشرة، ومواد القانون كلها من 1 إلى 298.'],
+  ['القرارات الوزارية', 'قرارات وزير العمل المنفذة للقانون، 23 قرار، وكل قرار معروض تحت المادة اللي صدر تنفيذاً ليها.'],
+  [
+    'مصدر النص',
+    'نص القانون مأخوذ من نسخة منشورة على موقع مكتب محاماة، بتحيل للجريدة الرسمية العدد 18 (تابع) بتاريخ 3 مايو 2025. والقرارات الوزارية مأخوذة من مجموعة منشورة، وممكن يكون فيها أخطاء طباعة. الاتنين مش منقولين من الجريدة الرسمية مباشرة، فقبل أي نزاع راجع الجريدة الرسمية.',
+  ],
+  ['ملاحظات عملية', 'شوية ملاحظات من ممارسين موارد بشرية عن حاجات برة نص قانون العمل، زي نسب التأمينات واستماراتها وحساب رصيد الإجازة. جيسي بتقول إنها من الممارسة، ومش بتعتبرها نص قانون.'],
+  ['معلومات من النت', 'لما السؤال يخص حاجة بتتغير زي الحد الأدنى للأجور، جيسي ممكن تدور في النت. ساعتها بتقول إنها من النت وبتعرض الرابط، ومش بتعتبرها نص قانون.'],
 ];
+
+/** Every article, under the book, part and chapter the law itself puts it in. */
+function chapters() {
+  const list: { title: string; from: number; to: number }[] = [];
+  for (const record of LAW) {
+    if (record.kind !== 'law' || !record.n) continue;
+    const title = record.chapter || record.part || record.book || 'أحكام عامة';
+    const last = list[list.length - 1];
+    if (last?.title === title) last.to = record.n;
+    else list.push({ title, from: record.n, to: record.n });
+  }
+  return list;
+}
 
 export default function Law() {
   return (
@@ -59,7 +77,7 @@ export default function Law() {
           نزاع أو قرار مهم، ارجع للشؤون القانونية في شركتك، أو لمكتب العمل التابع ليه، أو لمحامي.
         </p>
 
-        <p className="opacity-90">لو السؤال مش من باب الإجازات، جيسي بتقول إنها ما تعرفش بدل ما تخمّن — وده مقصود.</p>
+        <p className="opacity-90">لو مفيش نص بيجاوب على السؤال، جيسي بتقول إنها مش لاقية نص بدل ما تخمّن — وده مقصود.</p>
       </section>
 
       <h2 className="mt-12 text-lg font-bold">المصادر</h2>
@@ -73,6 +91,22 @@ export default function Law() {
           </div>
         ))}
       </dl>
+
+      <h2 className="mt-12 text-lg font-bold">مواد القانون</h2>
+      <span aria-hidden className="mt-2.5 block h-px w-8 rounded-full bg-gold/60" />
+
+      <ul className="mt-4 text-sm">
+        {chapters().map((c) => (
+          <li key={`${c.title}${c.from}`} className="flex items-baseline justify-between gap-4 border-b border-black/10 py-2.5">
+            <Link href={`/law/${c.from}`} className="underline decoration-ink/25 underline-offset-4 hover:decoration-gold">
+              {c.title}
+            </Link>
+            <span className="shrink-0 text-xs tabular-nums opacity-60">
+              {c.from === c.to ? `المادة ${c.from}` : `المواد ${c.from} إلى ${c.to}`}
+            </span>
+          </li>
+        ))}
+      </ul>
 
       <p className="mt-10 text-center text-xs opacity-55">
         كل رقم في الإجابات مكتوب في المصادر دي، ومع كل إجابة رقم المادة اللي جه منها.

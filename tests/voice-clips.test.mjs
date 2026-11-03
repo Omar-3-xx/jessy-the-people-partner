@@ -58,13 +58,14 @@ test('what a model said has no recording and must not claim one', () => {
   assert.equal(clipFor('busy'), null);
 });
 
-test('the chat hands the answer id to the voice', () => {
-  // Without the id, speak() cannot find the recording and every answer quietly falls back to
-  // speechSynthesis — the whole feature gone, with every test above still passing.
+test('every answer is read through the server voice, and the browser voice catches a failure', () => {
+  // No answer is fixed any more, so a recording cannot be looked up by id. If either line goes,
+  // she falls silent or reads with the device's voice, with every other test still passing.
   const ask = readFileSync(new URL('../src/components/chat/ask.tsx', import.meta.url), 'utf8');
-  assert.match(ask, /voice\.speak\(answer\.text,\s*answer\.id\)/);
-  assert.match(ask, /mood: data\.mood, id: data\.id/);
-  assert.match(ask, /mood: local\.mood, id: local\.id/);
+  const speech = readFileSync(new URL('../src/lib/talk/use-speech.ts', import.meta.url), 'utf8');
+  assert.match(ask, /voice\.speak\(answer\.text\)/);
+  assert.match(speech, /fetch\('\/api\/speak'/);
+  assert.match(speech, /else sayWithBrowser\(text\)/);
 });
 
 test('the clips are cached but not for so long a re-recording is stuck behind them', () => {

@@ -4,36 +4,38 @@ import Link from 'next/link';
 import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react';
 
 import { JessyFace, createFaceDriver, type FaceDriver, type FaceState } from '@/components/talk/jessy-face';
-import { answerFrom, type KbAnswer, type Mood } from '@/lib/kb';
-import { ENTRIES, FALLBACK } from '@/lib/kb-data';
+import type { KbAnswer, Mood } from '@/lib/kb';
 import { EAR_MESSAGE, useEars, useVoice } from '@/lib/talk/use-speech';
 
 /*
- * The chat. The server answers; if it cannot be reached at all, the same
- * knowledge base runs here in the browser, so the site still answers offline.
+ * The chat. The server reads the law and answers, and each answer comes with the
+ * articles it stands on, so anyone about to rely on it can read them in place. If
+ * the server cannot be reached she says so: an old offline list of leave answers
+ * used to run here instead, and could give a confident answer to the wrong question.
  *
  * Jessy is a face, not a picture: the driver below is a plain object the face
  * reads sixty times a second, so her mouth moves with the voice and her eyes
  * blink and glance without React re-rendering a thing. She listens through the
- * browser's microphone, and answers in her own recorded voice wherever the
- * answer came from the law; nothing is recorded and nothing leaves the device
- * but the question itself.
+ * browser's microphone; nothing is recorded and nothing leaves the device but the
+ * question itself.
  */
 
 const SUGGESTIONS = [
-  'أنا مستحق كام يوم إجازة في السنة؟',
-  'الإجازة العارضة كام يوم؟',
-  'إجازة الوضع كام شهر؟',
-  'العطلات الرسمية كام مناسبة؟',
-  'عايز أروح الحج، في إجازة؟',
-  'في إجازة بدون مرتب في القانون؟',
+  'اترفدت من غير سبب، حقوقي إيه؟',
+  'الأوفر تايم بيتحسب إزاي؟',
+  'عايز أستقيل، أعمل إيه بالظبط؟',
+  'الشركة خصمت مني أسبوع عشان اتأخرت، ينفع؟',
+  'اشتغلت 7 شهور، ليا كام يوم إجازة؟',
+  'عقدي سنة وخلص ولسه شغال، وضعي إيه؟',
 ];
 
-type Said = { who: 'me' | 'jessy'; text: string; link?: KbAnswer['link'] };
+type Source = { name: string; href: string; chapter?: string; text: string };
+type WebSource = { title: string; url: string };
+type Said = { who: 'me' | 'jessy'; text: string; link?: KbAnswer['link']; sources?: Source[]; web?: WebSource[] };
 
 /** What she is doing, in words, under the face. */
 const CAPTION: Record<FaceState, string> = {
-  idle: 'اسألني عن أي إجازة في قانون العمل',
+  idle: 'اسألني في أي حاجة في قانون العمل',
   listening: 'بسمعك…',
   thinking: 'بفكر…',
   speaking: 'بتكلم',
@@ -70,10 +72,13 @@ export function Ask() {
   }, [ears.listening, setFace]);
 
   const say = useCallback(
-    (answer: { text: string; link?: KbAnswer['link']; mood?: Mood; id?: string }) => {
-      setSaid((prev) => [...prev, { who: 'jessy', text: answer.text, link: answer.link }]);
+    (answer: { text: string; link?: KbAnswer['link']; mood?: Mood; sources?: Source[]; web?: WebSource[] }) => {
+      setSaid((prev) => [
+        ...prev,
+        { who: 'jessy', text: answer.text, link: answer.link, sources: answer.sources, web: answer.web },
+      ]);
       const mood = answer.mood ?? 'calm';
-      if (!muted && voice.speak(answer.text, answer.id)) setFace('speaking', mood);
+      if (!muted && voice.speak(answer.text)) setFace('speaking', mood);
       else setFace('idle', mood);
     },
     [muted, voice, setFace],
@@ -95,13 +100,11 @@ export function Ask() {
           headers: { 'content-type': 'application/json' },
           body: JSON.stringify({ question: q, lang: 'ar', history }),
         });
-        const data = (await res.json()) as KbAnswer & { error?: string };
+        const data = (await res.json()) as KbAnswer & { error?: string; sources?: Source[]; web?: WebSource[] };
         if (data.error === 'busy') say({ text: 'في أسئلة كتير دلوقتي، جرب تاني بعد شوية.' });
-        else say({ text: data.text, link: data.link, mood: data.mood, id: data.id });
+        else say({ text: data.text, link: data.link, mood: data.mood, sources: data.sources, web: data.web });
       } catch {
-        // The server could not be reached: the same knowledge base, in the browser.
-        const local = answerFrom(ENTRIES, FALLBACK, q, 'ar');
-        say({ text: local.text, link: local.link, mood: local.mood, id: local.id });
+        say({ text: 'مش قادرة أوصل لنص القانون دلوقتي، النت عندك أو عندي فيه مشكلة. جرب تاني كمان شوية.' });
       } finally {
         setTyping(false);
         requestAnimationFrame(() => endRef.current?.scrollIntoView({ behavior: 'smooth' }));
@@ -197,7 +200,7 @@ export function Ask() {
           {/* The year used to break across two lines and leave "2025" stranded on the second. The
               non-breaking spaces hold "14 لسنة 2025" together; .balance evens what is left. */}
           <p className="balance mt-3 text-sm leading-relaxed opacity-85">
-            شريكتك في شؤون الموظفين — إجازات قانون العمل&nbsp;14 لسنة&nbsp;2025
+            شريكتك في شؤون الموظفين — قانون العمل المصري كله، 14 لسنة&nbsp;2025 وقراراته
           </p>
 
           <p
@@ -238,7 +241,7 @@ export function Ask() {
                     : 'answer surface inline-block max-w-[94%] rounded-2xl rounded-tr-md px-4 py-3 text-sm'
                 }
               >
-                {s.text}
+                <span className="whitespace-pre-line">{s.text}</span>
                 {s.link && (
                   <>
                     {' '}
@@ -251,6 +254,9 @@ export function Ask() {
                   </>
                 )}
               </div>
+              {s.who === 'jessy' && !!(s.sources?.length || s.web?.length) && (
+                <Sources sources={s.sources ?? []} web={s.web ?? []} />
+              )}
               {/* Decision 3 of his sheet: the line sits under EVERY answer, not once at the bottom
                   of the page, so it is read with the answer and not scrolled past. Page at /law. */}
               {s.who === 'jessy' && (
@@ -301,7 +307,7 @@ export function Ask() {
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
             maxLength={500}
-            placeholder={ears.listening ? 'بسمعك…' : 'اسألني عن أي إجازة…'}
+            placeholder={ears.listening ? 'بسمعك…' : 'احكيلي اللي حصل في الشغل…'}
             aria-label="سؤالك"
             className="h-12 flex-1 rounded-xl border border-black/15 bg-white px-4 text-sm shadow-sm outline-none transition placeholder:text-ink/40 focus:border-ink/45 focus:shadow"
           />
@@ -322,6 +328,43 @@ export function Ask() {
           </Link>
         </p>
       </form>
+    </div>
+  );
+}
+
+/**
+ * What an answer stands on: the articles it cited, opened in place, and any page from the web
+ * with its address showing, so a stranger's site is never mistaken for the law. A plain ruled
+ * list on the same white as the answer, because this is a thing to read and not a decoration.
+ */
+function Sources({ sources, web }: { sources: Source[]; web: WebSource[] }) {
+  return (
+    <div className="surface mt-1.5 inline-block w-full max-w-[94%] rounded-xl px-4 py-2 text-right text-xs">
+      {sources.map((source) => (
+        <details key={source.name + source.text.slice(0, 20)} className="border-b border-black/5 py-1.5 last:border-b-0">
+          <summary className="cursor-pointer font-semibold">{source.name}</summary>
+          <p className="mt-1.5 whitespace-pre-line leading-6 opacity-85">{source.text}</p>
+          <Link href={source.href} className="mt-1 inline-block underline decoration-gold underline-offset-4">
+            النص كامل
+          </Link>
+        </details>
+      ))}
+      {web.length > 0 && (
+        <div className="py-1.5">
+          <p className="font-semibold">من النت، مش من نص القانون:</p>
+          {web.map((page) => (
+            <a
+              key={page.url}
+              href={page.url}
+              target="_blank"
+              rel="noopener noreferrer nofollow"
+              className="mt-1 block truncate underline underline-offset-4 opacity-85"
+            >
+              {page.title}
+            </a>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
