@@ -1,5 +1,5 @@
 // Jessy on Cloudflare Workers, built by the OpenNext adapter.
-// Free plan throughout: no R2, KV, D1, Durable Objects or Images binding.
+// Free plan throughout: KV and D1 inside their free allowance, no R2, Durable Objects or Images binding.
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "jessy-people-partner",
@@ -20,6 +20,13 @@
   "ai": {
     "binding": "AI",
   },
+  // Her answers and her voice for the fixed common questions (src/lib/law/common.ts).
+  "kv_namespaces": [
+    {
+      "binding": "COMMON",
+      "id": "c392bbfbde834e239ed4226f0d55a273",
+    },
+  ],
   "observability": {
     "enabled": true,
   },

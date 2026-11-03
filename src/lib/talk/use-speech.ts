@@ -42,7 +42,7 @@ export interface Voice {
   supported: boolean;
   speaking: boolean;
   /** Says a reply aloud, server first, then the browser. False when neither can speak. */
-  speak: (text: string) => boolean;
+  speak: (text: string, common?: string) => boolean;
   stop: () => void;
   /** Called from a tap: phones let a page play or speak only once a tap has started it. */
   unlock: () => void;
@@ -190,7 +190,7 @@ export function useVoice(): Voice {
    * voice rather than leaving her silent; one that fails halfway just ends there.
    */
   const sayFromServer = useCallback(
-    (text: string) => {
+    (text: string, common?: string) => {
       const ctx = context();
       if (!ctx) return false;
       stop();
@@ -240,7 +240,7 @@ export function useVoice(): Voice {
       fetch('/api/speak', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ text: spoken }),
+        body: JSON.stringify({ text: spoken, common }),
         signal: reader.signal,
       })
         .then(async (res) => {
@@ -281,7 +281,7 @@ export function useVoice(): Voice {
   );
 
   const speak = useCallback(
-    (text: string) => sayFromServer(text) || sayWithBrowser(text),
+    (text: string, common?: string) => sayFromServer(text, common) || sayWithBrowser(text),
     [sayFromServer, sayWithBrowser],
   );
 

@@ -5,6 +5,7 @@ import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
 
 import { JessyFace, createFaceDriver, type FaceDriver, type FaceState } from '@/components/talk/jessy-face';
 import type { KbAnswer, Mood } from '@/lib/kb';
+import { FIRST_QUESTIONS, MORE_QUESTIONS } from '@/lib/law/common-questions';
 import { EAR_MESSAGE, useEars, useVoice } from '@/lib/talk/use-speech';
 
 /*
@@ -19,15 +20,6 @@ import { EAR_MESSAGE, useEars, useVoice } from '@/lib/talk/use-speech';
  * browser's microphone; nothing is recorded and nothing leaves the device but the
  * question itself.
  */
-
-const SUGGESTIONS = [
-  'اترفدت من غير سبب، حقوقي إيه؟',
-  'الأوفر تايم بيتحسب إزاي؟',
-  'عايز أستقيل، أعمل إيه بالظبط؟',
-  'الشركة خصمت مني أسبوع عشان اتأخرت، ينفع؟',
-  'اشتغلت 7 شهور، ليا كام يوم إجازة؟',
-  'عقدي سنة وخلص ولسه شغال، وضعي إيه؟',
-];
 
 type Source = { name: string; href: string; chapter?: string; text: string };
 type WebSource = { title: string; url: string };
@@ -47,6 +39,7 @@ export function Ask() {
   const [draft, setDraft] = useState('');
   const [muted, setMuted] = useState(false);
   const [state, setState] = useState<FaceState>('idle');
+  const [allQuestions, setAllQuestions] = useState(false);
   const endRef = useRef<HTMLDivElement>(null);
 
   const voice = useVoice();
@@ -72,13 +65,13 @@ export function Ask() {
   }, [ears.listening, setFace]);
 
   const say = useCallback(
-    (answer: { text: string; link?: KbAnswer['link']; mood?: Mood; sources?: Source[]; web?: WebSource[] }) => {
+    (answer: { text: string; link?: KbAnswer['link']; mood?: Mood; sources?: Source[]; web?: WebSource[]; common?: string }) => {
       setSaid((prev) => [
         ...prev,
         { who: 'jessy', text: answer.text, link: answer.link, sources: answer.sources, web: answer.web },
       ]);
       const mood = answer.mood ?? 'calm';
-      if (!muted && voice.speak(answer.text)) setFace('speaking', mood);
+      if (!muted && voice.speak(answer.text, answer.common)) setFace('speaking', mood);
       else setFace('idle', mood);
     },
     [muted, voice, setFace],
@@ -100,9 +93,9 @@ export function Ask() {
           headers: { 'content-type': 'application/json' },
           body: JSON.stringify({ question: q, lang: 'ar', history }),
         });
-        const data = (await res.json()) as KbAnswer & { error?: string; sources?: Source[]; web?: WebSource[] };
+        const data = (await res.json()) as KbAnswer & { error?: string; sources?: Source[]; web?: WebSource[]; common?: string };
         if (data.error === 'busy') say({ text: 'في أسئلة كتير دلوقتي، جرب تاني بعد شوية.' });
-        else say({ text: data.text, link: data.link, mood: data.mood, sources: data.sources, web: data.web });
+        else say({ text: data.text, link: data.link, mood: data.mood, sources: data.sources, web: data.web, common: data.common });
       } catch {
         say({ text: 'مش قادرة أوصل لنص القانون دلوقتي، النت عندك أو عندي فيه مشكلة. جرب تاني كمان شوية.' });
       } finally {
@@ -213,22 +206,35 @@ export function Ask() {
         </header>
 
         {said.length === 0 && (
-          <div className="mt-6 grid gap-2.5 sm:grid-cols-2">
-            {SUGGESTIONS.map((s, i) => (
-              <button
-                key={s}
-                type="button"
-                style={{ animationDelay: `${60 * i}ms` }}
-                onClick={() => {
-                  voice.unlock();
-                  void ask(s);
-                }}
-                className="chip rise rounded-xl px-4 py-3.5 text-right text-sm leading-relaxed"
-              >
-                {s}
-              </button>
-            ))}
-          </div>
+          <>
+            <div className="mt-6 grid gap-2.5 sm:grid-cols-2">
+              {(allQuestions ? [...FIRST_QUESTIONS, ...MORE_QUESTIONS] : FIRST_QUESTIONS).map((s, i) => (
+                <button
+                  key={s}
+                  type="button"
+                  style={{ animationDelay: `${allQuestions ? 0 : 60 * i}ms` }}
+                  onClick={() => {
+                    voice.unlock();
+                    void ask(s);
+                  }}
+                  className="chip rise rounded-xl px-4 py-3.5 text-right text-sm leading-relaxed"
+                >
+                  {s}
+                </button>
+              ))}
+            </div>
+            {!allQuestions && (
+              <p className="mt-3 text-center md:text-right">
+                <button
+                  type="button"
+                  onClick={() => setAllQuestions(true)}
+                  className="rounded-md bg-white/85 px-2 py-0.5 text-sm underline decoration-gold underline-offset-4"
+                >
+                  أسئلة تانية بيسألوها كتير
+                </button>
+              </p>
+            )}
+          </>
         )}
 
         <div className="mt-7 space-y-4">

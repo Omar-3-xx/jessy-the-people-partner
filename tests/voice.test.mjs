@@ -7,7 +7,7 @@ test('every answer is read through the server voice, and the browser voice catch
   // she falls silent or reads with the device's voice, with every other test still passing.
   const ask = readFileSync(new URL('../src/components/chat/ask.tsx', import.meta.url), 'utf8');
   const speech = readFileSync(new URL('../src/lib/talk/use-speech.ts', import.meta.url), 'utf8');
-  assert.match(ask, /voice\.speak\(answer\.text\)/);
+  assert.match(ask, /voice\.speak\(answer\.text, answer\.common\)/);
   assert.match(speech, /fetch\('\/api\/speak'/);
   assert.match(speech, /else sayWithBrowser\(text\)/);
 });

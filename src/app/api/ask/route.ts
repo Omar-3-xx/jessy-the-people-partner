@@ -3,6 +3,7 @@ import { getCloudflareContext } from '@opennextjs/cloudflare';
 import { answerFrom, type Lang } from '@/lib/kb';
 import { ENTRIES, FALLBACK } from '@/lib/kb-data';
 import { answerQuestion, type Turn } from '@/lib/law/answer';
+import { commonId, readAnswer, saveAnswer, shelfFrom, worthKeeping } from '@/lib/law/common';
 import { lawIndex } from '@/lib/law/index';
 import { GEMINI_DEFAULT, geminiProvider, workersAiProvider } from '@/lib/law/models';
 import { latinDigits } from '@/lib/numbers';
@@ -14,7 +15,7 @@ import { aiBindingFrom } from '@/lib/workers-ai';
  * in tests/ runs. Every exit says which model answered and why any before it did not, in Workers
  * Logs (observability is on in wrangler.jsonc). Never the key, never the person's words.
  *
- * Nothing is stored.
+ * Nothing anyone typed is stored. Only the answers to the fixed common questions are kept (common.ts).
  */
 
 export const runtime = 'nodejs';
@@ -109,16 +110,29 @@ export async function POST(req: Request) {
   const small = answerFrom(SMALL_ENTRIES, FALLBACK, question, pageLang);
   if (small.kind !== 'fallback') return Response.json({ ...small, sources: [], web: [] });
 
+  const env = cloudflareEnv();
+  const history = cleanHistory(body.history);
+  const shelf = shelfFrom(env);
+  // A follow-up means something only after what came before it, so it is never one of these.
+  const common = history.length ? null : commonId(question);
+  if (common && shelf) {
+    const kept = await readAnswer(shelf, common);
+    if (kept) {
+      console.log('[ask] answered from the kept answers');
+      return Response.json({ ...kept, common });
+    }
+  }
+
   const key = process.env.GEMINI_API_KEY;
   const models = GEMINI_MODELS.length ? GEMINI_MODELS : GEMINI_DEFAULT;
   const providers = key ? models.map((model) => geminiProvider(key, model)) : [];
-  const ai = aiBindingFrom(cloudflareEnv());
+  const ai = aiBindingFrom(env);
   if (ai) providers.push(workersAiProvider(ai));
   if (!providers.length) console.warn('[ask] no model reachable: no AI binding and no GEMINI_API_KEY');
 
   const answer = await answerQuestion({
     question,
-    history: cleanHistory(body.history),
+    history,
     index: lawIndex(),
     providers,
     keys: { tavily: process.env.TAVILY_API_KEY, gemini: key, geminiModel: models[0] },
@@ -127,5 +141,7 @@ export async function POST(req: Request) {
   if (answer.via) console.log(`[ask] answered by ${answer.via}`);
 
   const { via: _via, refused: _refused, ...sent } = answer;
-  return Response.json({ ...sent, lang: 'ar', text: latinDigits(sent.text) });
+  const reply = { ...sent, lang: 'ar', text: latinDigits(sent.text) };
+  if (common && shelf && worthKeeping(answer, models[0])) await saveAnswer(shelf, common, reply);
+  return Response.json({ ...reply, common: common ?? undefined });
 }
