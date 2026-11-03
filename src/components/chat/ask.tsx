@@ -3,11 +3,13 @@
 import Link from 'next/link';
 import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react';
 
+import { PrintSheet, type Sheet } from '@/components/chat/print-sheet';
 import { ReportWrong } from '@/components/chat/report-wrong';
 import { JessyFace, createFaceDriver, type FaceDriver, type FaceState } from '@/components/talk/jessy-face';
 import { postAsHuman } from '@/lib/human';
 import type { KbAnswer, Mood } from '@/lib/kb';
 import { FIRST_QUESTIONS, MORE_QUESTIONS } from '@/lib/law/common-questions';
+import { whatsappLink } from '@/lib/law/share';
 import { EAR_MESSAGE, useEars, useVoice } from '@/lib/talk/use-speech';
 
 /*
@@ -29,6 +31,8 @@ type WebSource = { title: string; url: string };
 type Said = { who: 'me' | 'jessy'; text: string; link?: KbAnswer['link']; sources?: Source[]; web?: WebSource[]; asked?: string };
 
 /** What she is doing, in words, under the face. */
+const ACTION = 'rounded-md bg-white/85 px-2 py-0.5 text-[11px] text-ink/70 underline decoration-ink/25 underline-offset-4 backdrop-blur-sm transition hover:text-ink hover:decoration-gold';
+
 const CAPTION: Record<FaceState, string> = {
   idle: 'اسألني في أي حاجة في قانون العمل',
   listening: 'بسمعك…',
@@ -43,6 +47,8 @@ export function Ask() {
   const [muted, setMuted] = useState(false);
   const [state, setState] = useState<FaceState>('idle');
   const [allQuestions, setAllQuestions] = useState(false);
+  // A new object on every press, so saving the same answer twice prints twice.
+  const [printing, setPrinting] = useState<{ sheet: Sheet } | null>(null);
   const endRef = useRef<HTMLDivElement>(null);
 
   const voice = useVoice();
@@ -66,6 +72,10 @@ export function Ask() {
   useEffect(() => {
     if (!ears.listening && driver.current.state === 'listening') setFace('idle', 'calm');
   }, [ears.listening, setFace]);
+
+  useEffect(() => {
+    if (printing) window.print();
+  }, [printing]);
 
   const say = useCallback(
     (answer: { text: string; link?: KbAnswer['link']; mood?: Mood; sources?: Source[]; web?: WebSource[]; common?: string; asked?: string }) => {
@@ -143,13 +153,13 @@ export function Ask() {
   }
 
   return (
-    <div className="relative min-h-dvh">
+    <div className="relative min-h-dvh print:min-h-0">
       {/*
        * The page is hers. She stands on it at full height — no circle, no card, no ring, nothing
        * drawn around her — and the conversation sits beside her on a wide screen, below her on a
        * phone. Nothing is laid over her face.
        */}
-      <div className="pointer-events-none fixed inset-0 z-0 md:right-auto md:w-[52vw]">
+      <div className="pointer-events-none fixed inset-0 z-0 md:right-auto md:w-[52vw] print:hidden">
         <JessyFace driver={driver} label="جيسي" className="h-full w-full" />
       </div>
 
@@ -162,7 +172,7 @@ export function Ask() {
        * gutter, and starts lower down so the block sits optically placed rather than crammed under
        * the top edge with the rest of the page empty below it.
        */}
-      <div className="relative z-10 mx-auto flex min-h-dvh max-w-2xl flex-col px-4 pb-36 pt-[58vh] md:ms-0 md:me-auto md:w-[44vw] md:max-w-xl md:ps-10 md:pe-8 md:pt-[12vh]">
+      <div className="relative z-10 mx-auto flex min-h-dvh max-w-2xl flex-col px-4 pb-36 pt-[58vh] md:ms-0 md:me-auto md:w-[44vw] md:max-w-xl md:ps-10 md:pe-8 md:pt-[12vh] print:hidden">
         {/* On a phone she is the whole screen, so the title lands on her jumper and the grey
             subtitle under it could not be read at all. It gets the same white the answers get,
             rather than a band across her: she stays whole, the words stay legible. */}
@@ -277,7 +287,38 @@ export function Ask() {
                 </p>
               )}
               {s.asked && (
-                <div className="mt-1.5">
+                <div className="mt-1.5 flex flex-wrap items-start gap-1.5">
+                  <a
+                    href={whatsappLink({
+                      question: s.asked,
+                      answer: s.text,
+                      sources: s.sources ?? [],
+                      web: s.web ?? [],
+                      site: window.location.origin,
+                    })}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className={ACTION}
+                  >
+                    ابعت على واتساب
+                  </a>
+                  <button
+                    type="button"
+                    className={ACTION}
+                    onClick={() =>
+                      setPrinting({
+                        sheet: {
+                          question: s.asked ?? '',
+                          answer: s.text,
+                          sources: s.sources ?? [],
+                          web: s.web ?? [],
+                          site: window.location.origin,
+                        },
+                      })
+                    }
+                  >
+                    احفظ PDF
+                  </button>
                   <ReportWrong question={s.asked} answer={s.text} articles={(s.sources ?? []).map((source) => source.name)} />
                 </div>
               )}
@@ -295,7 +336,7 @@ export function Ask() {
 
       <form
         onSubmit={onSubmit}
-        className="fixed inset-x-0 bottom-0 z-20 border-t border-black/5 bg-paper/85 shadow-[0_-10px_30px_-20px_rgb(27_42_74_/_0.35)] backdrop-blur-md"
+        className="fixed inset-x-0 bottom-0 z-20 border-t border-black/5 bg-paper/85 shadow-[0_-10px_30px_-20px_rgb(27_42_74_/_0.35)] backdrop-blur-md print:hidden"
       >
         <div className="mx-auto flex max-w-2xl items-center gap-2 px-4 pb-1.5 pt-3">
           {ears.supported && (
@@ -339,6 +380,8 @@ export function Ask() {
           </Link>
         </p>
       </form>
+
+      {printing && <PrintSheet sheet={printing.sheet} />}
     </div>
   );
 }

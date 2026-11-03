@@ -238,6 +238,18 @@ body {
   background-clip: content-box;
 }
 
+/* The saved sheet (components/chat/print-sheet.tsx) on plain white, whatever the page sits on. */
+@media print {
+  @page {
+    margin: 18mm;
+  }
+
+  html,
+  body {
+    background: #fff;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   html {
     scroll-behavior: auto;
