@@ -110,6 +110,8 @@ export async function answerQuestion(input: {
   const webOut = web.map((w) => ({ title: w.title, url: w.url }));
 
   const refused: string[] = [];
+  // Words alone miss what is said in other words. A day's allowance running out looks like nothing else.
+  if (keys.gemini && index.meaning && !vector) refused.push('meaning search: unavailable, words only');
   let correction = '';
   for (const provider of providers) {
     let raw: string;

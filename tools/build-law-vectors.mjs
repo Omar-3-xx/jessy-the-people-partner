@@ -33,7 +33,16 @@ async function embed(texts, attempt = 0) {
       })),
     }),
     signal: AbortSignal.timeout(120_000),
+  }).catch((err) => {
+    // A dropped connection is not the end of a run that takes minutes.
+    if (attempt >= 6) throw err;
+    return null;
   });
+  if (!res) {
+    console.log('no connection, waiting a minute');
+    await new Promise((r) => setTimeout(r, 62_000));
+    return embed(texts, attempt + 1);
+  }
   if (res.status === 429 && attempt < 6) {
     console.log('429, waiting a minute');
     await new Promise((r) => setTimeout(r, 62_000));
