@@ -27,6 +27,14 @@
       "id": "c392bbfbde834e239ed4226f0d55a273",
     },
   ],
+  // What people say she got wrong, kept only when they press send (src/lib/law/reports.ts).
+  "d1_databases": [
+    {
+      "binding": "REPORTS",
+      "database_name": "jessy-reports",
+      "database_id": "dc7ae8d5-c77d-4984-a03b-fb041bf72e4a",
+    },
+  ],
   "observability": {
     "enabled": true,
   },
