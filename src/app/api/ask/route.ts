@@ -7,6 +7,7 @@ import { commonId, readAnswer, saveAnswer, shelfFrom, worthKeeping } from '@/lib
 import { lawIndex } from '@/lib/law/index';
 import { GEMINI_DEFAULT, geminiProvider, workersAiProvider } from '@/lib/law/models';
 import { latinDigits } from '@/lib/numbers';
+import { checkHuman } from '@/lib/shield';
 import { aiBindingFrom } from '@/lib/workers-ai';
 
 /*
@@ -86,6 +87,14 @@ function cleanHistory(raw: unknown): Turn[] {
 }
 
 export async function POST(req: Request) {
+  const human = await checkHuman(req, process.env.TURNSTILE_SECRET);
+  if (!human.ok) return Response.json({ error: 'human' }, { status: 403 });
+  const res = await answerRequest(req);
+  if (human.setCookie) res.headers.append('set-cookie', human.setCookie);
+  return res;
+}
+
+async function answerRequest(req: Request): Promise<Response> {
   let body: { question?: unknown; history?: unknown };
   try {
     body = await req.json();

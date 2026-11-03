@@ -108,6 +108,17 @@ export default function Law() {
         ))}
       </ul>
 
+      <h2 className="mt-12 text-lg font-bold">خصوصيتك</h2>
+      <span aria-hidden className="mt-2.5 block h-px w-8 rounded-full bg-gold/60" />
+
+      <section className="answer mt-4 space-y-3 text-sm opacity-90">
+        <p>اللي بتكتبه لجيسي مش بيتسجل عندنا، وبيتبعت لخدمة الذكاء الاصطناعي عشان تجاوبك بس.</p>
+        <p>
+          عشان البرامج الآلية متستهلكش الخدمة، بنستخدم Cloudflare Turnstile مرة في الساعة، وبيتحط عندك ملف تعريف
+          (كوكي) واحد لمدة ساعة بيقول إنك شخص مش برنامج، ومفيهوش أي بيانات عنك.
+        </p>
+      </section>
+
       <p className="mt-10 text-center text-xs opacity-55">
         كل رقم في الإجابات مكتوب في المصادر دي، ومع كل إجابة رقم المادة اللي جه منها.
       </p>

@@ -16,6 +16,7 @@
 import { getCloudflareContext } from '@opennextjs/cloudflare';
 
 import { commonId, readAnswer, readVoice, saveVoice, shelfFrom, type Shelf } from '@/lib/law/common';
+import { checkHuman } from '@/lib/shield';
 import { speakable } from '@/lib/talk/voice';
 
 export const runtime = 'nodejs';
@@ -89,6 +90,10 @@ function cloudflare() {
 }
 
 export async function POST(req: Request) {
+  // The question before this one earned the pass, so there is no token here: refused means her
+  // browser voice takes over, not a challenge in the middle of an answer.
+  if (!(await checkHuman(req, process.env.TURNSTILE_SECRET)).ok) return new Response(null, { status: 403 });
+
   let body: { text?: unknown; common?: unknown };
   try {
     body = await req.json();
