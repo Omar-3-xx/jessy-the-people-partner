@@ -18,5 +18,3 @@
 
 # Her recorded answers. The names never change, so this is deliberately short: a line she
 # re-records replaces the file under the same name and must reach everyone the next day.
-/voice/*
-  Cache-Control: public,max-age=86400,stale-while-revalidate=604800

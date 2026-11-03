@@ -3,7 +3,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import test from 'node:test';
 
 import { checkAnswer, citedArticles, numbersIn, statedFigures } from '../src/lib/law/figures.ts';
-import { buildIndex, namedArticles, normalise, search, tokens } from '../src/lib/law/search.ts';
+import { buildIndex, citeName, namedArticles, normalise, search, tokens } from '../src/lib/law/search.ts';
 import { wantsWeb } from '../src/lib/law/web.ts';
 
 const records = JSON.parse(readFileSync(new URL('../src/lib/law/law-data.json', import.meta.url), 'utf8'));
@@ -60,6 +60,29 @@ test('the questions that used to go wrong now reach their article', () => {
   }
 });
 
+test('a question about a fine reaches the penalty that cites the rule, far off in the last book', () => {
+  const found = search(index, 'المادة 108 الشركة ممكن تتغرم كام؟', 1).map((h) => h.record.n);
+  assert.ok(found.includes(287), `287 cites 108 and was not brought: ${found.join(', ')}`);
+  const plain = search(index, 'إيه هي المادة 108؟', 1).map((h) => h.record.n);
+  assert.ok(!plain.includes(287), 'no fine was asked about, and its seat should stay free');
+});
+
+test('an article brings its neighbours in the same chapter, and only those', () => {
+  const hits = search(index, 'إيه هي المادة 232؟', 1);
+  const found = hits.map((h) => h.record.n);
+  assert.deepEqual(found.slice(0, 3), [232, 233, 231]);
+  const last = search(index, 'إيه هي المادة 298؟', 1).map((h) => h.record.n);
+  assert.ok(!last.includes(299), 'there is nothing after the last article');
+});
+
+test('a practice note is never in the law\'s place, and never more than one', () => {
+  const hits = search(index, 'نسبة التأمينات كام وبتتحسب ازاي استمارة 6', 12);
+  const notes = hits.filter((h) => h.record.kind === 'practice');
+  assert.ok(notes.length <= 1, `${notes.length} notes`);
+  assert.ok(hits.filter((h) => h.record.kind !== 'practice').length >= 12, 'a note took a seat from the law');
+  assert.match(citeName({ kind: 'practice', label: 'x' }), /مش نص قانون/);
+});
+
 test('an article named outright is always first', () => {
   assert.equal(search(index, 'إيه هي المادة 166؟', 8)[0].record.n, 166);
 });
@@ -114,7 +137,9 @@ function askedVector(id) {
 }
 
 test('the exam: the right article is among what she reads', { skip: !existsSync(new URL('./law-exam.json', import.meta.url)) }, () => {
-  const exam = JSON.parse(readFileSync(new URL('./law-exam.json', import.meta.url), 'utf8')).filter((q) => !q.outside);
+  const exam = ['./law-exam.json', './law-exam-fresh.json']
+    .flatMap((f) => JSON.parse(readFileSync(new URL(f, import.meta.url), 'utf8')))
+    .filter((q) => !q.outside);
   const vectors = JSON.parse(readFileSync(new URL('../src/lib/law/law-vectors.json', import.meta.url), 'utf8'));
   const siteIndex = buildIndex(records, vectors);
   assert.ok(siteIndex.meaning, 'the vectors were built from a different law: run tools/build-law-vectors.mjs');

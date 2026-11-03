@@ -70,7 +70,7 @@ console.log('written');
 
 // The exam's questions as well, so the test measures the search the site really runs without
 // needing a key. Each is embedded the way a visitor's question is.
-const exam = JSON.parse(readFileSync(new URL('tests/law-exam.json', root), 'utf8'));
+const exam = ['tests/law-exam.json', 'tests/law-exam-fresh.json'].flatMap((f) => JSON.parse(readFileSync(new URL(f, root), 'utf8')));
 const unseen = exam.filter((q) => !cache[hashOf(q.q)]);
 for (let i = 0; i < unseen.length; i += BATCH) {
   const part = unseen.slice(i, i + BATCH);

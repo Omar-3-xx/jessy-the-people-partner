@@ -124,7 +124,7 @@ const SEEDS: [RegExp, number[]][] = [
   [/من غير عقد|بدون عقد|مفيش عقد|ماضيتش عقد|مضيتش علي عقد|مش موظف عندي/, [88, 89]],
   [/(^| )(باع|اتباع)|بيع|اندماج|دمج/, [11]],
   [/الكهربا|عطل|(المصنع|الشغل) واقف|وقف الشغل|توقف/, [111]],
-  [/الليل.*(بيبدا|بيتحسب|امتي)|(بيبدا|بيتحسب|امتي).*الليل|تعريف|يعني ايه/, [1]],
+  [/الليل.*(بيبدا|بيتحسب|امتي)|(بيبدا|بيتحسب|امتي).*الليل|تعريف|يعني ايه|الفرق بين|معني/, [1]],
   [/تحقيق|تحقبق|قرار جزا|توقيع (ال)?جزا/, [138, 139, 140, 141]],
   [/مخالصه|اتنازلت|تنازل/, [6]],
   [/افلاس|بتفلس|فلست|تصفيه|ديون/, [8]],
@@ -303,6 +303,8 @@ export type LawIndex = {
   average: number;
   df: Map<string, number>;
   byArticle: Map<number, LawRecord>;
+  /** The penalty articles that cite each article. */
+  punishedBy: Map<number, LawRecord[]>;
   meaning?: { dims: number; bytes: Int8Array };
 };
 
@@ -333,8 +335,16 @@ export function buildIndex(records: LawRecord[], vectors?: LawVectors): LawIndex
     for (const t of map.keys()) df.set(t, (df.get(t) ?? 0) + 1);
     if (record.kind === 'law' && record.n) byArticle.set(record.n, record);
   }
+  // A penalty names the rules it punishes in its first brackets: "أحكام المواد (45، 104، 108)".
+  const punishedBy = new Map<number, LawRecord[]>();
+  for (const record of records) {
+    if (record.kind !== 'law' || !record.part?.includes('العقوبات')) continue;
+    for (const m of (record.text.match(/\(([\d،,\s]+)\)/)?.[1] ?? '').match(/\d+/g) ?? []) {
+      punishedBy.set(Number(m), [...(punishedBy.get(Number(m)) ?? []), record]);
+    }
+  }
   const average = lengths.reduce((a, b) => a + b, 0) / Math.max(1, lengths.length);
-  return { records, terms, lengths, average, df, byArticle, meaning: readVectors(records, vectors) };
+  return { records, terms, lengths, average, df, byArticle, punishedBy, meaning: readVectors(records, vectors) };
 }
 
 /** The articles the person named outright: "المادة 124", "ماده ١٢٤", "م 124". */
@@ -354,6 +364,38 @@ export function weightedTerms(question: string): Map<string, number> {
     for (const t of tokens(law)) if (!weights.has(t)) weights.set(t, WIDENED);
   }
   return weights;
+}
+
+/** How many of the closest articles bring what the law keeps beside them, and how much they may bring. */
+const NEAR_TOP = 5;
+const NEAR_MAX = 6;
+const ASKS_PENALTY = /غرام|تغرم|عقوب|تعاقب|حبس|تحبس/;
+
+/**
+ * What the law's own arrangement says belongs with the closest articles: the penalty that cites a
+ * rule, when that is what was asked, and the articles either side of it in the same chapter, since
+ * the law often splits one subject across neighbours. These come on top of the seats, never in them.
+ */
+function alongside(index: LawIndex, found: Hit[], question: string): Hit[] {
+  const taken = new Set(found.map((h) => h.record));
+  const closest = found.map((h) => h.record).filter((r) => r.kind === 'law' && r.n).slice(0, NEAR_TOP);
+  const extra: LawRecord[] = [];
+  const add = (record?: LawRecord) => {
+    if (record && !taken.has(record)) {
+      taken.add(record);
+      extra.push(record);
+    }
+  };
+  if (ASKS_PENALTY.test(normalise(question))) {
+    for (const r of closest) for (const penalty of index.punishedBy.get(r.n!) ?? []) add(penalty);
+  }
+  for (const r of closest) {
+    for (const n of [r.n! + 1, r.n! - 1]) {
+      const near = index.byArticle.get(n);
+      if (near && (near.chapter || near.part) === (r.chapter || r.part)) add(near);
+    }
+  }
+  return extra.slice(0, NEAR_MAX).map((record) => ({ record, score: 0 }));
 }
 
 /** How far down a list a rank still counts; the usual constant for joining ranked lists. */
@@ -428,7 +470,8 @@ export function search(index: LawIndex, question: string, limit = 8, questionVec
   // A practice note may come along if it ranks with the law, but only one, and never in the law's place.
   const practice = ordered.slice(0, limit).find((h) => h.record.kind === 'practice');
   const law = ordered.filter((h) => h.record.kind !== 'practice').slice(0, limit);
-  return practice ? [...law, practice] : law;
+  const near = alongside(index, law, question);
+  return practice ? [...law, ...near, practice] : [...law, ...near];
 }
 
 /** The name a record is cited by. */
