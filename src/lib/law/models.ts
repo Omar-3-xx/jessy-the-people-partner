@@ -50,7 +50,8 @@ export function geminiProvider(key: string, model: string): Provider {
       if (candidate?.finishReason && candidate.finishReason !== 'STOP') {
         throw new Error(`reply dropped, finishReason ${candidate.finishReason}`);
       }
-      return (candidate?.content?.parts ?? []).map((part) => part.text ?? '').join('\n');
+      // Parts can end in the middle of a word, so nothing goes between them.
+      return (candidate?.content?.parts ?? []).map((part) => part.text ?? '').join('');
     },
   };
 }
