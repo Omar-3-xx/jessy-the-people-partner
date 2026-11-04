@@ -71,11 +71,17 @@ export function numbersIn(text: string): Set<string> {
   return out;
 }
 
-/** An article the answer cites: "المادة 124", "مادة 124", "(مادة 124)", "المواد 124 و125". */
+/**
+ * An article the answer cites: "المادة 124", "مادة 124", "(مادة 124)", "المواد 124 و125".
+ * "المادة 9 من قرار وزير العمل 279" is an article of the decree, not Article 9 of the law.
+ */
 export function citedArticles(text: string): number[] {
   const latin = flat(text);
   const found = new Set<number>();
-  for (const m of latin.matchAll(/(?:ماده|الماده|لماده|بالماده)\s*\(?\s*(\d{1,3})/g)) found.add(Number(m[1]));
+  const OF_ANOTHER = String.raw`(?!\d)(?!\)?\s*من\s+(?:ال)?(?:قرار|لائح|قانون الت))`;
+  for (const m of latin.matchAll(new RegExp(String.raw`(?:ماده|الماده|لماده|بالماده)\s*\(?\s*(\d{1,3})` + OF_ANOTHER, 'g'))) {
+    found.add(Number(m[1]));
+  }
   for (const m of latin.matchAll(/(?:مواد|المواد)\s*\(?\s*([\d\s،,و\-]+)/g)) {
     for (const n of m[1].match(/\d+/g) ?? []) found.add(Number(n));
   }

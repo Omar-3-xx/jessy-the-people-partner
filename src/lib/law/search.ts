@@ -102,8 +102,9 @@ export function tokens(text: string): string[] {
  * happens to use. BM25 alone sends "اشتغلت 7 شهور، ليا إجازة؟" to every article with "إجازة" in
  * it and misses the one that answers, because the word is too common to count. A seed lifts its
  * articles into what she reads; it is not an answer, and the words still order everything else.
+ * A record id seeds one slice of a decree, where a rule sits deep inside a long slice the words miss.
  */
-const SEEDS: [RegExp, number[]][] = [
+const SEEDS: [RegExp, (number | string)[]][] = [
   [/اجاز.*(سنو|اعتياد|رصيد|شهور|شهر|سنه|سنين|كام|جديد|تعيين|مديري|رافض|رفض|مخدتهاش|فلوس|مقابل)|annual|vacation|رصيد/, [124, 125]],
   [/عارض|طارئ|ظرف/, [128]],
   [/امتحان|دراس|كليه|جامع/, [126]],
@@ -117,7 +118,9 @@ const SEEDS: [RegExp, number[]][] = [
   [/رفد|طرد|فصل|fired|dismiss|مشوني/, [165, 170, 169]],
   [/استقال|استقيل|resign/, [167, 168]],
   [/غبت|غياب|انقطع|اتغيب/, [166]],
-  [/خصم|جزاء|لائحه/, [143]],
+  [/خصم|جزاء|لائحه/, [143, 148]],
+  [/مدير (ال)?(فرع|منشاه)|بامضته|بامضاء/, [148]],
+  [/اجانب|اجنبي|foreign/, [70, 'd279-2025-1']],
   [/محدد المده|تجديد|عقد سنه|عقد مؤقت/, [88, 154]],
   [/اختبار|بروبيشن|probation|تجربه/, [91]],
   [/نهايه الخدمه|مكافا/, [172]],
@@ -133,9 +136,9 @@ const SEEDS: [RegExp, number[]][] = [
 ];
 const SEED_BONUS = 4.5;
 
-function seededArticles(question: string): Set<number> {
+function seededArticles(question: string): Set<number | string> {
   const text = normalise(question);
-  const out = new Set<number>();
+  const out = new Set<number | string>();
   for (const [re, articles] of SEEDS) if (re.test(text)) for (const a of articles) out.add(a);
   return out;
 }
@@ -335,13 +338,17 @@ export function buildIndex(records: LawRecord[], vectors?: LawVectors): LawIndex
     for (const t of map.keys()) df.set(t, (df.get(t) ?? 0) + 1);
     if (record.kind === 'law' && record.n) byArticle.set(record.n, record);
   }
-  // A penalty names the rules it punishes in its first brackets: "أحكام المواد (45، 104، 108)".
+  // A penalty names the rules it punishes: "أحكام المواد (37 فقرة أولى، 153)", and often in a
+  // later paragraph too, "حكم المادة 137". Only the first brackets were read once, and Article
+  // 283's fine for having no penalty rules never reached the question it answers.
   const punishedBy = new Map<number, LawRecord[]>();
   for (const record of records) {
     if (record.kind !== 'law' || !record.part?.includes('العقوبات')) continue;
-    for (const m of (record.text.match(/\(([\d،,\s]+)\)/)?.[1] ?? '').match(/\d+/g) ?? []) {
-      punishedBy.set(Number(m), [...(punishedBy.get(Number(m)) ?? []), record]);
+    const named = new Set<number>();
+    for (const m of record.text.matchAll(/(?:المواد|المادتين|المادة)\s*(?:\(([^)]*)\)|(\d+))/g)) {
+      for (const n of (m[1] ?? m[2]).match(/\d+/g) ?? []) if (Number(n) !== record.n) named.add(Number(n));
     }
+    for (const n of named) punishedBy.set(n, [...(punishedBy.get(n) ?? []), record]);
   }
   const average = lengths.reduce((a, b) => a + b, 0) / Math.max(1, lengths.length);
   return { records, terms, lengths, average, df, byArticle, punishedBy, meaning: readVectors(records, vectors) };
@@ -437,7 +444,7 @@ export function search(index: LawIndex, question: string, limit = 8, questionVec
       score += weight * idf * ((tf * (BM25_K + 1)) / (tf + norm));
     }
     if (record.kind === 'decree' || record.kind === 'practice') score *= DECREE_DISCOUNT;
-    if (record.n && seeded.has(record.n)) score += SEED_BONUS;
+    if ((record.n && seeded.has(record.n)) || seeded.has(record.id)) score += SEED_BONUS;
     if (score > 0) hits.push({ record, score });
   });
   hits.sort((a, b) => b.score - a.score);
@@ -452,8 +459,8 @@ export function search(index: LawIndex, question: string, limit = 8, questionVec
       if (!scoreOf.has(record)) hits.push({ record, score: 0 });
     });
     // A subject's own articles vote as a third list: a bonus on the word score alone is lost here.
-    [...seeded].forEach((article, rank) => {
-      const record = index.byArticle.get(article);
+    [...seeded].forEach((seed, rank) => {
+      const record = typeof seed === 'number' ? index.byArticle.get(seed) : index.records.find((r) => r.id === seed);
       if (!record) return;
       votes.set(record, (votes.get(record) ?? 0) + 1 / (FUSION + rank));
       if (!scoreOf.has(record) && !hits.some((h) => h.record === record)) hits.push({ record, score: 0 });

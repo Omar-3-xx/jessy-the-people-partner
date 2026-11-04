@@ -158,3 +158,17 @@ test('the exam: the right article is among what she reads', { skip: !existsSync(
 });
 
 const EXAM_FLOOR = 0.95;
+
+test('a penalty found in a later paragraph reaches the rule it punishes', async () => {
+  // Article 283 fines a missing penalty bylaw (Article 137) in its second paragraph only.
+  const { buildIndex } = await import('../src/lib/law/search.ts');
+  const records = JSON.parse(readFileSync(new URL('../src/lib/law/law-data.json', import.meta.url), 'utf8'));
+  const index = buildIndex(records);
+  assert.ok((index.punishedBy.get(137) ?? []).some((r) => r.n === 283));
+});
+
+test('an article of a decree is not taken for the law article of the same number', async () => {
+  const { citedArticles } = await import('../src/lib/law/figures.ts');
+  assert.deepEqual(citedArticles('ده طبقاً للمادة 9 من قرار وزير العمل 279 لسنة 2025'), []);
+  assert.deepEqual(citedArticles('طبقاً للمادة 138 من قانون العمل'), [138]);
+});
