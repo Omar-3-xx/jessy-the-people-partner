@@ -16,3 +16,10 @@ test('her voice is Sulafat, the one he chose, unless a setting says otherwise', 
   const route = readFileSync(new URL('../src/app/api/speak/route.ts', import.meta.url), 'utf8');
   assert.match(route, /process\.env\.JESSY_VOICE \|\| 'Sulafat'/);
 });
+
+test('only her words go to the voice model, which reads aloud whatever it is given', () => {
+  // A direction in English above the words was read out before every answer (4 Nov 2026).
+  const route = readFileSync(new URL('../src/app/api/speak/route.ts', import.meta.url), 'utf8');
+  assert.match(route, /contents: \[\{ parts: \[\{ text \}\] \}\]/);
+  assert.ok(!/Read this|Cairene|DIRECTION/.test(route));
+});

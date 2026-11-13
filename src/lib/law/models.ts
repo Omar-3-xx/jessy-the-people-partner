@@ -35,8 +35,9 @@ export function geminiProvider(key: string, model: string): Provider {
               maxOutputTokens: MAX_TOKENS,
               temperature: 0.1,
               // Reasoning spends the output budget first and cuts the reply off mid-word. The newest
-              // lite model answers a budget of 0 with a bare 400 and takes a level instead.
-              thinkingConfig: model.includes('3.5-flash-lite') ? { thinkingLevel: 'minimal' } : { thinkingBudget: 0 },
+              // lite model answers a budget of 0 with a bare 400 and takes a level instead; at
+              // "minimal" it answered the words of a question and missed its case, so it gets "low".
+              thinkingConfig: model.includes('3.5-flash-lite') ? { thinkingLevel: 'low' } : { thinkingBudget: 0 },
             },
           }),
           signal: AbortSignal.timeout(CALL_TIMEOUT_MS),

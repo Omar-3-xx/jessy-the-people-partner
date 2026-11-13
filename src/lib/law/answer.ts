@@ -59,7 +59,10 @@ function sourcesFor(answer: string, hits: Hit[], index: LawIndex): SourceOut[] {
   );
   // A practice note is named under the answer whenever it was leaned on, so nobody takes it for law.
   const practice = answer.includes('الممارسة') ? hits.filter((h) => h.record.kind === 'practice').slice(0, 1) : [];
-  const list = [...cited, ...decrees.map((h) => h.record), ...practice.map((h) => h.record)];
+  // A decree comes in several slices under one name, and the name is shown once.
+  const list = [...cited, ...decrees.map((h) => h.record), ...practice.map((h) => h.record)].filter(
+    (r, i, all) => all.findIndex((o) => citeName(o) === citeName(r)) === i,
+  );
   return (list.length ? list : hits.slice(0, 2).map((h) => h.record)).slice(0, 6).map((r) => outOf(r));
 }
 

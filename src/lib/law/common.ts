@@ -15,7 +15,7 @@
 import { COMMON_QUESTIONS } from './common-questions.ts';
 import { normalise } from './search.ts';
 
-const ANSWERS_VERSION = 1;
+const ANSWERS_VERSION = 2;
 const KEEP_SECONDS = 30 * 24 * 60 * 60;
 /** Her pace is about 0.1 s a character, so a third of that is a stream that was cut off. */
 const MIN_SECONDS_PER_CHAR = 0.03;
